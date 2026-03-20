@@ -351,7 +351,17 @@ export default function App() {
   const dueSoon     = allClips.filter(c => { const diff = (new Date(c.deadline) - todayDate) / 86400000; return c.status !== "completed" && diff >= 0 && diff <= 2; });
   const awaitReview = allClips.filter(c => c.status === "review");
   const dueToday    = allClips.filter(c => new Date(c.deadline).toDateString() === todayDate.toDateString() && c.status !== "completed");
-  function getProgress(clips) { return clips.length ? Math.round(clips.filter(c => c.status === "completed").length / clips.length * 100) : 0; }
+  function getProgress(clips) {
+    if (!clips.length) return 0;
+    const score = clips.reduce((sum, c) => {
+      if (c.status === "completed") return sum + 100;
+      if (c.status === "review")    return sum + 80;
+      if (c.status === "revision")  return sum + 50;
+      if (c.status === "in_progress") return sum + 30;
+      return sum;
+    }, 0);
+    return Math.round(score / clips.length);
+  }
 
   // ── Project CRUD ──────────────────────────────────────────────
   async function handleAddProj() {
