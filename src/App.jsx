@@ -277,7 +277,7 @@ export default function App() {
   const [editEditorName, setEditEditorName] = useState("");
   const [search, setSearch] = useState("");
 
-  // ── Load — ไม่ reset loading ถ้าโหลดซ้ำ (background refresh) ──
+  // ── Load ──────────────────────────────────────────────────────
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -305,15 +305,42 @@ export default function App() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Realtime — silent refresh ──────────────────────────────────
+  // ── Realtime — อัปเดต state ตรงๆ ไม่ reload ทั้งหมด ──────────
   useEffect(() => {
     const channel = db.channel("digicon-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "clips" },    () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "editors" },  () => loadData(true))
+      // Projects
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "projects" }, ({ new: row }) => {
+        setProjects(prev => [...prev, { ...row, clips: [] }]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects" }, ({ new: row }) => {
+        setProjects(prev => prev.map(p => p.id === row.id ? { ...p, ...row } : p));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "projects" }, ({ old: row }) => {
+        setProjects(prev => prev.filter(p => p.id !== row.id));
+      })
+      // Clips
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "clips" }, ({ new: row }) => {
+        setProjects(prev => prev.map(p => p.id === row.project_id ? { ...p, clips: [...p.clips.filter(c => c.id !== row.id), row] } : p));
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "clips" }, ({ new: row }) => {
+        setProjects(prev => prev.map(p => p.id === row.project_id ? { ...p, clips: p.clips.map(c => c.id === row.id ? row : c) } : p));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "clips" }, ({ old: row }) => {
+        setProjects(prev => prev.map(p => ({ ...p, clips: p.clips.filter(c => c.id !== row.id) })));
+      })
+      // Editors
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "editors" }, ({ new: row }) => {
+        setEditors(prev => [...prev.filter(e => e.id !== row.id), row].sort((a, b) => a.id - b.id));
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "editors" }, ({ new: row }) => {
+        setEditors(prev => prev.map(e => e.id === row.id ? row : e));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "editors" }, ({ old: row }) => {
+        setEditors(prev => prev.filter(e => e.id !== row.id));
+      })
       .subscribe();
     return () => db.removeChannel(channel);
-  }, [loadData]);
+  }, []);
 
   const allClips = useMemo(() =>
     projects.flatMap(p => p.clips.map(c => ({ ...c, projectId: p.id, projectName: p.client }))),
