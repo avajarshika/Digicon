@@ -1,13 +1,19 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
   LayoutDashboard, Users, FolderOpen, ChevronRight, Plus,
   Clock, CheckCircle2, AlertTriangle, Film, Calendar, ChevronLeft,
   Edit2, Check, Loader2, Circle, Eye, ArrowLeft, Trash2,
   Search, Bell, Target, ChevronDown, CalendarPlus, CalendarDays,
-  ExternalLink, Link2, MessageSquare, X, Save, Pencil
+  ExternalLink, Link2, MessageSquare, X, Save, Pencil, RefreshCw
 } from "lucide-react";
 
-// ─── Default Data ────────────────────────────────────────────────
+// ─── Supabase ────────────────────────────────────────────────────
+const SUPABASE_URL = "https://wkmgpjtxkxomphslddjm.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbWdwanR4a3hvbXBoc2xkZGptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTgwMjQsImV4cCI6MjA4OTU3NDAyNH0.Z56CarFSTBgkjVvGAOPMW0Q5rTU2YX1Jw6q5ZD9Agqc";
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── Constants ───────────────────────────────────────────────────
 const DEFAULT_EDITORS = [
   { id: 1,  name: "นายต้น",      color: "bg-indigo-500"  },
   { id: 2,  name: "นายเก่ง",     color: "bg-violet-500"  },
@@ -28,11 +34,11 @@ const EDITOR_COLORS = [
 ];
 
 const STATUSES = [
-  { value: "pending",     label: "รอดำเนินการ", icon: Circle,       bg: "bg-slate-100 text-slate-600",   dot: "bg-slate-400"    },
-  { value: "in_progress", label: "กำลังตัดต่อ", icon: Loader2,      bg: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500"   },
-  { value: "review",      label: "รอตรวจงาน",   icon: Eye,          bg: "bg-amber-100 text-amber-700",   dot: "bg-amber-400"    },
-  { value: "revision",    label: "แก้ไข",        icon: Edit2,        bg: "bg-orange-100 text-orange-700", dot: "bg-orange-400"   },
-  { value: "completed",   label: "เสร็จสิ้น",    icon: CheckCircle2, bg: "bg-emerald-100 text-emerald-700",dot:"bg-emerald-500"  },
+  { value: "pending",     label: "รอดำเนินการ", icon: Circle,       bg: "bg-slate-100 text-slate-600",    dot: "bg-slate-400"   },
+  { value: "in_progress", label: "กำลังตัดต่อ", icon: Loader2,      bg: "bg-indigo-100 text-indigo-700",  dot: "bg-indigo-500"  },
+  { value: "review",      label: "รอตรวจงาน",   icon: Eye,          bg: "bg-amber-100 text-amber-700",    dot: "bg-amber-400"   },
+  { value: "revision",    label: "แก้ไข",        icon: Edit2,        bg: "bg-orange-100 text-orange-700",  dot: "bg-orange-400"  },
+  { value: "completed",   label: "เสร็จสิ้น",    icon: CheckCircle2, bg: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500" },
 ];
 
 const TH_MONTHS       = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
@@ -56,53 +62,6 @@ function fmtDate(iso) {
 
 function makeId() {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function initProjects(editors) {
-  return [
-    {
-      id: "proj-1", client: "บริษัท เทคโนวิชั่น จำกัด", pm: "คุณมาลี", broker: "คุณสมชาย", createdAt: addDays(-10),
-      clips: [
-        { id: "c1", name: "Corporate Intro - Version 1",   editorId: editors[0].id, deadline: addDays(-1), status: "completed",  note: "", link: "" },
-        { id: "c2", name: "Product Showcase - Hero Scene", editorId: editors[1].id, deadline: addDays(1),  status: "review",     note: "", link: "" },
-        { id: "c3", name: "Behind The Scenes - Day 1",     editorId: editors[2].id, deadline: addDays(2),  status: "in_progress",note: "", link: "" },
-        { id: "c4", name: "Customer Testimonial - Pack A", editorId: editors[0].id, deadline: addDays(4),  status: "pending",    note: "", link: "" },
-        { id: "c5", name: "Social Media Cut - 30sec",      editorId: editors[4].id, deadline: addDays(-2), status: "revision",   note: "ลูกค้าขอแก้สีโทน warm", link: "" },
-      ],
-    },
-    {
-      id: "proj-2", client: "โรงแรม ซันไรส์ รีสอร์ท", pm: "คุณพิม", broker: "คุณอนันต์", createdAt: addDays(-5),
-      clips: [
-        { id: "c6", name: "Hotel Overview - Main Film", editorId: editors[3].id, deadline: addDays(3), status: "in_progress", note: "", link: "" },
-        { id: "c7", name: "Room Tour - Deluxe Suite",   editorId: editors[5].id, deadline: addDays(5), status: "pending",    note: "", link: "" },
-        { id: "c8", name: "Spa & Wellness Highlight",   editorId: editors[6].id, deadline: addDays(0), status: "review",     note: "", link: "" },
-      ],
-    },
-    {
-      id: "proj-3", client: "ร้านอาหาร เฮือนลาว", pm: "คุณกานต์", broker: "คุณปอ", createdAt: addDays(-3),
-      clips: [
-        { id: "c9",  name: "Menu Highlight Reel",        editorId: editors[7].id,  deadline: addDays(2), status: "completed", note: "", link: "" },
-        { id: "c10", name: "Chef Story Documentary",     editorId: editors[8].id,  deadline: addDays(6), status: "completed", note: "", link: "" },
-        { id: "c11", name: "Ambiance & Atmosphere Clip", editorId: editors[9].id,  deadline: addDays(1), status: "completed", note: "", link: "" },
-      ],
-    },
-  ];
-}
-
-// ─── Hooks ────────────────────────────────────────────────────────
-function useLS(key, init) {
-  const [val, setVal] = useState(() => {
-    try {
-      const s = localStorage.getItem(key);
-      return s ? JSON.parse(s) : (typeof init === "function" ? init() : init);
-    } catch { return typeof init === "function" ? init() : init; }
-  });
-  function set(v) {
-    const n = typeof v === "function" ? v(val) : v;
-    setVal(n);
-    localStorage.setItem(key, JSON.stringify(n));
-  }
-  return [val, set];
 }
 
 // ─── Google Calendar ──────────────────────────────────────────────
@@ -165,12 +124,12 @@ function DatePicker({ value, onChange, placeholder }) {
 
   const selected = value ? new Date(value) : null;
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
-  const daysInM  = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const cells    = Array.from({ length: firstDay }, () => null).concat(Array.from({ length: daysInM }, (_, i) => i + 1));
+  const daysInM = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells = Array.from({ length: firstDay }, () => null).concat(Array.from({ length: daysInM }, (_, i) => i + 1));
 
   function pick(day) { onChange(new Date(viewYear, viewMonth, day).toISOString().split("T")[0]); setOpen(false); setMode("days"); }
-  function isTod(d)  { return new Date(viewYear, viewMonth, d).toDateString() === todayDate.toDateString(); }
-  function isSel(d)  { return selected && new Date(viewYear, viewMonth, d).toDateString() === selected.toDateString(); }
+  function isTod(d) { return new Date(viewYear, viewMonth, d).toDateString() === todayDate.toDateString(); }
+  function isSel(d) { return selected && new Date(viewYear, viewMonth, d).toDateString() === selected.toDateString(); }
 
   function prev() {
     if (mode === "days") { viewMonth === 0 ? (setViewMonth(11), setViewYear(y => y - 1)) : setViewMonth(m => m - 1); }
@@ -197,31 +156,23 @@ function DatePicker({ value, onChange, placeholder }) {
             <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500"><ChevronLeft size={15} /></button>
             <div className="flex items-center gap-1">
               {mode !== "months" && (
-                <button onClick={() => setMode(m => m === "days" ? "months" : "days")}
-                  className="text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors">
-                  {TH_MONTHS[viewMonth]}
-                </button>
+                <button onClick={() => setMode(m => m === "days" ? "months" : "days")} className="text-sm font-semibold text-slate-700 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors">{TH_MONTHS[viewMonth]}</button>
               )}
-              <button onClick={() => setMode(m => m === "years" ? "days" : "years")}
-                className="text-sm font-bold text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors">
-                {viewYear + 543}
-              </button>
+              <button onClick={() => setMode(m => m === "years" ? "days" : "years")} className="text-sm font-bold text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors">{viewYear + 543}</button>
             </div>
             <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500"><ChevronRight size={15} /></button>
           </div>
           {mode === "years" && (
             <div className="grid grid-cols-4 gap-1 p-3">
               {Array.from({ length: 12 }, (_, i) => viewYear - 5 + i).map(y => (
-                <button key={y} onClick={() => { setViewYear(y); setMode("months"); }}
-                  className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${y === viewYear ? "bg-indigo-600 text-white" : "hover:bg-indigo-50 text-slate-700"}`}>{y + 543}</button>
+                <button key={y} onClick={() => { setViewYear(y); setMode("months"); }} className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${y === viewYear ? "bg-indigo-600 text-white" : "hover:bg-indigo-50 text-slate-700"}`}>{y + 543}</button>
               ))}
             </div>
           )}
           {mode === "months" && (
             <div className="grid grid-cols-3 gap-1 p-3">
               {TH_MONTHS_SHORT.map((m, i) => (
-                <button key={i} onClick={() => { setViewMonth(i); setMode("days"); }}
-                  className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${i === viewMonth ? "bg-indigo-600 text-white" : "hover:bg-indigo-50 text-slate-700"}`}>{m}</button>
+                <button key={i} onClick={() => { setViewMonth(i); setMode("days"); }} className={`py-2.5 rounded-xl text-sm font-medium transition-colors ${i === viewMonth ? "bg-indigo-600 text-white" : "hover:bg-indigo-50 text-slate-700"}`}>{m}</button>
               ))}
             </div>
           )}
@@ -236,11 +187,7 @@ function DatePicker({ value, onChange, placeholder }) {
                 {cells.map((day, i) => (
                   <div key={i}>
                     {day ? (
-                      <button onClick={() => pick(day)}
-                        className={`w-full aspect-square rounded-xl text-sm font-medium transition-all flex items-center justify-center
-                          ${isSel(day) ? "bg-indigo-600 text-white" : isTod(day) ? "bg-indigo-100 text-indigo-700 font-bold ring-2 ring-indigo-300" : "hover:bg-slate-100 text-slate-700"}`}>
-                        {day}
-                      </button>
+                      <button onClick={() => pick(day)} className={`w-full aspect-square rounded-xl text-sm font-medium transition-all flex items-center justify-center ${isSel(day) ? "bg-indigo-600 text-white" : isTod(day) ? "bg-indigo-100 text-indigo-700 font-bold ring-2 ring-indigo-300" : "hover:bg-slate-100 text-slate-700"}`}>{day}</button>
                     ) : <div />}
                   </div>
                 ))}
@@ -257,18 +204,15 @@ function DatePicker({ value, onChange, placeholder }) {
   );
 }
 
-// ─── GCal Export Modal ────────────────────────────────────────────
+// ─── GCal Modal ───────────────────────────────────────────────────
 function GCalModal({ project, editors, onClose }) {
   const pending = project.clips.filter(c => c.status !== "completed");
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={18} className="text-blue-500" />
-            <h2 className="font-bold text-slate-800 text-sm">ส่งออกไป Google Calendar</h2>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-200 text-slate-500 transition-colors"><X size={16} /></button>
+          <div className="flex items-center gap-2"><CalendarDays size={18} className="text-blue-500" /><h2 className="font-bold text-slate-800 text-sm">ส่งออกไป Google Calendar</h2></div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-200 text-slate-500"><X size={16} /></button>
         </div>
         <div className="px-5 py-4">
           <p className="text-xs text-slate-500 mb-1">โปรเจกต์: <span className="font-semibold text-slate-700">{project.client}</span></p>
@@ -278,7 +222,7 @@ function GCalModal({ project, editors, onClose }) {
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {pending.map(clip => {
-                const editor = editors.find(e => e.id === clip.editorId);
+                const editor = editors.find(e => e.id === clip.editor_id);
                 const isOver = new Date(clip.deadline) < todayDate;
                 const details = `[Digicon Team]\nโปรเจกต์: ${project.client}\nคนตัดต่อ: ${editor ? editor.name : "ไม่ระบุ"}\nสถานะ: ${STATUSES.find(s => s.value === clip.status)?.label}${clip.note ? `\nหมายเหตุ: ${clip.note}` : ""}`;
                 return (
@@ -327,9 +271,9 @@ function CalendarView({ allClips, editors }) {
   const [calMonth, setCalMonth] = useState(todayDate.getMonth());
   const [selDay, setSelDay] = useState(null);
 
-  const firstDay   = new Date(calYear, calMonth, 1).getDay();
-  const daysInM    = new Date(calYear, calMonth + 1, 0).getDate();
-  const prevM      = new Date(calYear, calMonth, 0).getDate();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInM = new Date(calYear, calMonth + 1, 0).getDate();
+  const prevM = new Date(calYear, calMonth, 0).getDate();
   const cells = [];
   for (let i = firstDay - 1; i >= 0; i--) cells.push({ day: prevM - i, cur: false });
   for (let i = 1; i <= daysInM; i++) cells.push({ day: i, cur: true });
@@ -342,11 +286,9 @@ function CalendarView({ allClips, editors }) {
   }
   function isTod(d, c) { return c && new Date(calYear, calMonth, d).toDateString() === todayDate.toDateString(); }
   function isSel(d, c) { return c && selDay && new Date(calYear, calMonth, d).toDateString() === selDay.toDateString(); }
-
   const selClips = selDay ? allClips.filter(c => c.deadline === selDay.toISOString().split("T")[0]) : [];
-
-  function prevM2() { calMonth === 0 ? (setCalMonth(11), setCalYear(y => y - 1)) : setCalMonth(m => m - 1); }
-  function nextM2() { calMonth === 11 ? (setCalMonth(0), setCalYear(y => y + 1)) : setCalMonth(m => m + 1); }
+  function prevMo() { calMonth === 0 ? (setCalMonth(11), setCalYear(y => y - 1)) : setCalMonth(m => m - 1); }
+  function nextMo() { calMonth === 11 ? (setCalMonth(0), setCalYear(y => y + 1)) : setCalMonth(m => m + 1); }
 
   return (
     <div className="space-y-5">
@@ -354,34 +296,24 @@ function CalendarView({ allClips, editors }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <button onClick={prevM2} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500"><ChevronLeft size={18} /></button>
+            <button onClick={prevMo} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500"><ChevronLeft size={18} /></button>
             <h2 className="font-bold text-slate-800">{TH_MONTHS[calMonth]} {calYear + 543}</h2>
-            <button onClick={nextM2} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500"><ChevronRight size={18} /></button>
+            <button onClick={nextMo} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500"><ChevronRight size={18} /></button>
           </div>
           <div className="grid grid-cols-7 border-b border-slate-100">
-            {TH_DAYS.map((d, i) => (
-              <div key={d} className={`text-center py-2.5 text-xs font-semibold ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-slate-400"}`}>{d}</div>
-            ))}
+            {TH_DAYS.map((d, i) => <div key={d} className={`text-center py-2.5 text-xs font-semibold ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-slate-400"}`}>{d}</div>)}
           </div>
           <div className="grid grid-cols-7">
             {cells.map((cell, idx) => {
               const clips = clipsOn(cell.day, cell.cur);
-              const sel = isSel(cell.day, cell.cur);
-              const tod = isTod(cell.day, cell.cur);
-              const col = idx % 7;
+              const sel = isSel(cell.day, cell.cur), tod = isTod(cell.day, cell.cur), col = idx % 7;
               return (
                 <div key={idx} onClick={() => { if (!cell.cur) return; const d = new Date(calYear, calMonth, cell.day); setSelDay(sel ? null : d); }}
                   className={`min-h-16 p-1.5 border-b border-r border-slate-100 transition-colors ${col === 6 ? "border-r-0" : ""} ${!cell.cur ? "bg-slate-50/60" : sel ? "bg-indigo-50" : "hover:bg-slate-50 cursor-pointer"}`}>
-                  <div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold mb-1 mx-auto
-                    ${tod ? "bg-indigo-600 text-white" : sel ? "bg-indigo-100 text-indigo-700" : cell.cur ? (col === 0 ? "text-red-400" : col === 6 ? "text-blue-400" : "text-slate-700") : "text-slate-300"}`}>
-                    {cell.day}
-                  </div>
+                  <div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-semibold mb-1 mx-auto ${tod ? "bg-indigo-600 text-white" : sel ? "bg-indigo-100 text-indigo-700" : cell.cur ? (col === 0 ? "text-red-400" : col === 6 ? "text-blue-400" : "text-slate-700") : "text-slate-300"}`}>{cell.day}</div>
                   {cell.cur && clips.length > 0 && (
                     <div className="space-y-0.5">
-                      {clips.slice(0, 2).map(c => {
-                        const st = STATUSES.find(s => s.value === c.status);
-                        return <div key={c.id} className={`text-xs px-1.5 py-0.5 rounded-md truncate font-medium leading-tight ${st.bg}`}>{c.name.length > 9 ? c.name.slice(0, 9) + "…" : c.name}</div>;
-                      })}
+                      {clips.slice(0, 2).map(c => { const st = STATUSES.find(s => s.value === c.status); return <div key={c.id} className={`text-xs px-1.5 py-0.5 rounded-md truncate font-medium leading-tight ${st.bg}`}>{c.name.length > 9 ? c.name.slice(0, 9) + "…" : c.name}</div>; })}
                       {clips.length > 2 && <div className="text-xs text-center text-slate-400 font-medium">+{clips.length - 2}</div>}
                     </div>
                   )}
@@ -390,7 +322,6 @@ function CalendarView({ allClips, editors }) {
             })}
           </div>
         </div>
-
         <div className="space-y-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">สถานะงาน</h3>
@@ -404,13 +335,10 @@ function CalendarView({ allClips, editors }) {
               ))}
             </div>
           </div>
-
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
               <Calendar size={14} className="text-indigo-500" />
-              <h3 className="text-sm font-semibold text-slate-700 flex-1 truncate">
-                {selDay ? `${selDay.getDate()} ${TH_MONTHS[selDay.getMonth()]} ${selDay.getFullYear() + 543}` : "คลิกวันที่เพื่อดูงาน"}
-              </h3>
+              <h3 className="text-sm font-semibold text-slate-700 flex-1 truncate">{selDay ? `${selDay.getDate()} ${TH_MONTHS[selDay.getMonth()]} ${selDay.getFullYear() + 543}` : "คลิกวันที่เพื่อดูงาน"}</h3>
               {selClips.length > 0 && <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">{selClips.length}</span>}
             </div>
             {!selDay ? (
@@ -420,7 +348,7 @@ function CalendarView({ allClips, editors }) {
             ) : (
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {selClips.map(clip => {
-                  const editor = editors.find(e => e.id === clip.editorId);
+                  const editor = editors.find(e => e.id === clip.editor_id);
                   return (
                     <div key={clip.id} className="px-4 py-3 flex items-start gap-2">
                       <Avatar editor={editor} size="sm" />
@@ -435,7 +363,6 @@ function CalendarView({ allClips, editors }) {
               </div>
             )}
           </div>
-
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">งาน 7 วันข้างหน้า</h3></div>
             <div className="divide-y divide-slate-100">
@@ -445,16 +372,13 @@ function CalendarView({ allClips, editors }) {
                 const clips = allClips.filter(c => c.deadline === ds && c.status !== "completed");
                 if (!clips.length) return null;
                 return (
-                  <div key={i} className="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setSelDay(d)}>
+                  <div key={i} className="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-slate-50" onClick={() => setSelDay(d)}>
                     <div className={`w-9 text-center shrink-0 ${i === 0 ? "text-indigo-600" : "text-slate-500"}`}>
                       <div className="text-xs text-slate-400">{TH_DAYS[d.getDay()]}</div>
                       <div className="text-base font-bold leading-tight">{d.getDate()}</div>
                     </div>
                     <div className="flex-1 min-w-0 flex flex-wrap gap-1">
-                      {clips.slice(0, 2).map(c => {
-                        const st = STATUSES.find(s => s.value === c.status);
-                        return <span key={c.id} className={`text-xs px-1.5 py-0.5 rounded-full ${st.bg}`}>{c.name.slice(0, 12)}{c.name.length > 12 ? "…" : ""}</span>;
-                      })}
+                      {clips.slice(0, 2).map(c => { const st = STATUSES.find(s => s.value === c.status); return <span key={c.id} className={`text-xs px-1.5 py-0.5 rounded-full ${st.bg}`}>{c.name.slice(0, 12)}{c.name.length > 12 ? "…" : ""}</span>; })}
                       {clips.length > 2 && <span className="text-xs text-slate-400 self-center">+{clips.length - 2}</span>}
                     </div>
                   </div>
@@ -472,41 +396,79 @@ function CalendarView({ allClips, editors }) {
 //  MAIN APP
 // ═══════════════════════════════════════════════════════
 export default function App() {
-  const [editors, setEditors] = useLS("digicon_editors_v1", DEFAULT_EDITORS);
-  const [projects, setProjects] = useLS("digicon_projects_v4", () => initProjects(DEFAULT_EDITORS));
+  const [projects, setProjects] = useState([]);
+  const [editors, setEditors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   const [view, setView] = useState("dashboard");
   const [selProj, setSelProj] = useState(null);
   const [selEditor, setSelEditor] = useState(null);
   const [gcalModal, setGcalModal] = useState(null);
-  const [confirmDel, setConfirmDel] = useState(null); // { type, id, projId? }
+  const [confirmDel, setConfirmDel] = useState(null);
 
-  // Clip editing
   const [editingClip, setEditingClip] = useState(null);
   const [addingClip, setAddingClip] = useState(false);
   const [newClip, setNewClip] = useState({ name: "", editorId: "", deadline: "", status: "pending", note: "", link: "" });
-
-  // Project editing
   const [addingProj, setAddingProj] = useState(false);
-  const [editingProj, setEditingProj] = useState(null); // project id being edited
+  const [editingProj, setEditingProj] = useState(null);
   const [editProjData, setEditProjData] = useState({});
   const [newProj, setNewProj] = useState({ client: "", pm: "", broker: "" });
-
-  // Editor editing
   const [editingEditorId, setEditingEditorId] = useState(null);
   const [editEditorName, setEditEditorName] = useState("");
-
   const [search, setSearch] = useState("");
+
+  // ── Load data from Supabase ───────────────────────────────────
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [{ data: editorsData }, { data: projectsData }, { data: clipsData }] = await Promise.all([
+        db.from("editors").select("*").order("id"),
+        db.from("projects").select("*").order("created_at"),
+        db.from("clips").select("*"),
+      ]);
+
+      // Seed editors if empty
+      if (!editorsData || editorsData.length === 0) {
+        await db.from("editors").insert(DEFAULT_EDITORS);
+        setEditors(DEFAULT_EDITORS);
+      } else {
+        setEditors(editorsData);
+      }
+
+      // Merge clips into projects
+      const projsWithClips = (projectsData || []).map(p => ({
+        ...p,
+        clips: (clipsData || []).filter(c => c.project_id === p.id),
+      }));
+      setProjects(projsWithClips);
+    } catch (err) {
+      console.error("Load error:", err);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Realtime subscription ─────────────────────────────────────
+  useEffect(() => {
+    const channel = db.channel("realtime-changes")
+      .on("postgres_changes", { event: "*", schema: "public" }, () => {
+        loadData();
+      })
+      .subscribe();
+    return () => db.removeChannel(channel);
+  }, [loadData]);
 
   const allClips = useMemo(() =>
     projects.flatMap(p => p.clips.map(c => ({ ...c, projectId: p.id, projectName: p.client }))),
     [projects]
   );
 
-  const overdue     = allClips.filter(c => c.status !== "completed" && new Date(c.deadline) < todayDate);
-  const dueSoon     = allClips.filter(c => { const diff = (new Date(c.deadline) - todayDate) / 86400000; return c.status !== "completed" && diff >= 0 && diff <= 2; });
+  const overdue = allClips.filter(c => c.status !== "completed" && new Date(c.deadline) < todayDate);
+  const dueSoon = allClips.filter(c => { const diff = (new Date(c.deadline) - todayDate) / 86400000; return c.status !== "completed" && diff >= 0 && diff <= 2; });
   const awaitReview = allClips.filter(c => c.status === "review");
-  const dueToday    = allClips.filter(c => new Date(c.deadline).toDateString() === todayDate.toDateString() && c.status !== "completed");
+  const dueToday = allClips.filter(c => new Date(c.deadline).toDateString() === todayDate.toDateString() && c.status !== "completed");
 
   function getProgress(clips) {
     if (!clips.length) return 0;
@@ -514,69 +476,94 @@ export default function App() {
   }
 
   // ── Project CRUD ──────────────────────────────────────────────
-  function handleAddProj() {
+  async function handleAddProj() {
     if (!newProj.client.trim()) return;
-    setProjects(prev => [...prev, { id: makeId(), client: newProj.client, pm: newProj.pm, broker: newProj.broker, createdAt: new Date().toISOString().split("T")[0], clips: [] }]);
+    setSyncing(true);
+    const proj = { id: makeId(), client: newProj.client, pm: newProj.pm, broker: newProj.broker, created_at: new Date().toISOString().split("T")[0] };
+    await db.from("projects").insert(proj);
     setNewProj({ client: "", pm: "", broker: "" });
     setAddingProj(false);
+    setSyncing(false);
   }
 
-  function startEditProj(proj) {
-    setEditingProj(proj.id);
-    setEditProjData({ client: proj.client, pm: proj.pm, broker: proj.broker });
-  }
-
-  function saveEditProj() {
-    setProjects(prev => prev.map(p => p.id === editingProj ? { ...p, ...editProjData } : p));
-    if (selProj && selProj.id === editingProj) setSelProj(p => ({ ...p, ...editProjData }));
+  async function saveEditProj() {
+    setSyncing(true);
+    await db.from("projects").update({ client: editProjData.client, pm: editProjData.pm, broker: editProjData.broker }).eq("id", editingProj);
     setEditingProj(null);
+    setSyncing(false);
   }
 
-  function deleteProj(id) {
-    setProjects(prev => prev.filter(p => p.id !== id));
+  async function deleteProj(id) {
+    setSyncing(true);
+    await db.from("projects").delete().eq("id", id);
     if (selProj && selProj.id === id) { setSelProj(null); setView("management"); }
     setConfirmDel(null);
+    setSyncing(false);
   }
 
   // ── Clip CRUD ─────────────────────────────────────────────────
-  function updateClip(pid, cid, changes) {
-    setProjects(prev => prev.map(p => p.id === pid ? { ...p, clips: p.clips.map(c => c.id === cid ? { ...c, ...changes } : c) } : p));
+  async function updateClip(cid, changes) {
+    setSyncing(true);
+    // map editorId → editor_id for DB
+    const dbChanges = { ...changes };
+    if ("editorId" in dbChanges) { dbChanges.editor_id = dbChanges.editorId; delete dbChanges.editorId; }
+    await db.from("clips").update(dbChanges).eq("id", cid);
+    setSyncing(false);
   }
 
-  function deleteClip(pid, cid) {
-    setProjects(prev => prev.map(p => p.id === pid ? { ...p, clips: p.clips.filter(c => c.id !== cid) } : p));
+  async function deleteClip(cid) {
+    setSyncing(true);
+    await db.from("clips").delete().eq("id", cid);
     setConfirmDel(null);
+    setSyncing(false);
   }
 
-  function handleAddClip() {
+  async function handleAddClip() {
     if (!newClip.name.trim()) return;
-    const clip = { id: makeId(), name: newClip.name, editorId: newClip.editorId ? parseInt(newClip.editorId) : null, deadline: newClip.deadline || addDays(7), status: newClip.status || "pending", note: newClip.note || "", link: newClip.link || "" };
-    setProjects(prev => prev.map(p => p.id === currentProject.id ? { ...p, clips: [...p.clips, clip] } : p));
+    setSyncing(true);
+    const clip = {
+      id: makeId(),
+      project_id: currentProject.id,
+      name: newClip.name,
+      editor_id: newClip.editorId ? parseInt(newClip.editorId) : null,
+      deadline: newClip.deadline || addDays(7),
+      status: newClip.status || "pending",
+      note: newClip.note || "",
+      link: newClip.link || "",
+    };
+    await db.from("clips").insert(clip);
     setNewClip({ name: "", editorId: "", deadline: "", status: "pending", note: "", link: "" });
     setAddingClip(false);
+    setSyncing(false);
   }
 
   // ── Editor CRUD ───────────────────────────────────────────────
-  function saveEditorName(id) {
+  async function saveEditorName(id) {
     if (editEditorName.trim()) {
-      setEditors(prev => prev.map(e => e.id === id ? { ...e, name: editEditorName.trim() } : e));
+      setSyncing(true);
+      await db.from("editors").update({ name: editEditorName.trim() }).eq("id", id);
+      setSyncing(false);
     }
     setEditingEditorId(null);
   }
 
-  function addEditor() {
+  async function addEditor() {
     const color = EDITOR_COLORS[editors.length % EDITOR_COLORS.length];
-    const newEd = { id: Date.now(), name: `คนตัดต่อใหม่ ${editors.length + 1}`, color };
-    setEditors(prev => [...prev, newEd]);
-    setEditingEditorId(newEd.id);
+    const newId = Math.max(...editors.map(e => e.id), 0) + 1;
+    const newEd = { id: newId, name: `คนตัดต่อใหม่ ${newId}`, color };
+    setSyncing(true);
+    await db.from("editors").insert(newEd);
+    setEditingEditorId(newId);
     setEditEditorName(newEd.name);
+    setSyncing(false);
   }
 
-  function deleteEditor(id) {
-    setEditors(prev => prev.filter(e => e.id !== id));
-    // remove from clips
-    setProjects(prev => prev.map(p => ({ ...p, clips: p.clips.map(c => c.editorId === id ? { ...c, editorId: null } : c) })));
+  async function deleteEditor(id) {
+    setSyncing(true);
+    await db.from("editors").delete().eq("id", id);
+    await db.from("clips").update({ editor_id: null }).eq("editor_id", id);
     setConfirmDel(null);
+    setSyncing(false);
   }
 
   const currentProject = selProj ? projects.find(p => p.id === selProj.id) : null;
@@ -591,6 +578,19 @@ export default function App() {
   function navGo(id) { setView(id); setSelProj(null); setSelEditor(null); setEditingClip(null); }
   function isActive(id) { return view === id || (id === "management" && view === "project") || (id === "editors" && view === "editor"); }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Film size={24} className="text-white animate-pulse" />
+          </div>
+          <p className="text-slate-500 text-sm">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {gcalModal && <GCalModal project={gcalModal} editors={editors} onClose={() => setGcalModal(null)} />}
@@ -598,7 +598,7 @@ export default function App() {
         <ConfirmDialog
           message={confirmDel.type === "clip" ? "ลบคลิปนี้?" : confirmDel.type === "project" ? "ลบโปรเจกต์นี้ทั้งหมด?" : "ลบคนตัดต่อคนนี้?"}
           onConfirm={() => {
-            if (confirmDel.type === "clip") deleteClip(confirmDel.projId, confirmDel.id);
+            if (confirmDel.type === "clip") deleteClip(confirmDel.id);
             else if (confirmDel.type === "project") deleteProj(confirmDel.id);
             else deleteEditor(confirmDel.id);
           }}
@@ -606,7 +606,7 @@ export default function App() {
         />
       )}
 
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 shrink-0">
@@ -617,6 +617,7 @@ export default function App() {
               <span className="font-black text-slate-800 text-base tracking-tight">Digicon</span>
               <span className="font-black text-indigo-500 text-base tracking-tight"> Team</span>
             </div>
+            {syncing && <RefreshCw size={14} className="text-indigo-400 animate-spin ml-1" />}
           </div>
           <nav className="hidden md:flex items-center gap-0.5">
             {navItems.map(item => {
@@ -645,7 +646,7 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-6 pb-24 md:pb-8">
 
-        {/* ═══ DASHBOARD ═══ */}
+        {/* DASHBOARD */}
         {view === "dashboard" && (
           <div className="space-y-6">
             <div>
@@ -654,10 +655,10 @@ export default function App() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "งานเลยกำหนด", value: overdue.length,     icon: AlertTriangle, color: "text-red-500",    bg: "bg-red-50",    border: "border-red-100"    },
-                { label: "ส่งใน 2 วัน",  value: dueSoon.length,     icon: Clock,         color: "text-amber-500",  bg: "bg-amber-50",  border: "border-amber-100"  },
-                { label: "รอตรวจงาน",    value: awaitReview.length, icon: Eye,           color: "text-indigo-500", bg: "bg-indigo-50", border: "border-indigo-100" },
-                { label: "คลิปทั้งหมด",  value: allClips.length,    icon: Film,          color: "text-slate-500",  bg: "bg-slate-50",  border: "border-slate-200"  },
+                { label: "งานเลยกำหนด", value: overdue.length, icon: AlertTriangle, color: "text-red-500", bg: "bg-red-50", border: "border-red-100" },
+                { label: "ส่งใน 2 วัน", value: dueSoon.length, icon: Clock, color: "text-amber-500", bg: "bg-amber-50", border: "border-amber-100" },
+                { label: "รอตรวจงาน", value: awaitReview.length, icon: Eye, color: "text-indigo-500", bg: "bg-indigo-50", border: "border-indigo-100" },
+                { label: "คลิปทั้งหมด", value: allClips.length, icon: Film, color: "text-slate-500", bg: "bg-slate-50", border: "border-slate-200" },
               ].map(card => {
                 const Icon = card.icon;
                 return (
@@ -668,7 +669,6 @@ export default function App() {
                 );
               })}
             </div>
-
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
                 <Target size={16} className="text-indigo-500" />
@@ -680,14 +680,11 @@ export default function App() {
               ) : (
                 <div className="divide-y divide-slate-50">
                   {dueToday.map(clip => {
-                    const editor = editors.find(e => e.id === clip.editorId);
+                    const editor = editors.find(e => e.id === clip.editor_id);
                     return (
-                      <div key={clip.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50">
+                      <div key={clip.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50 flex-wrap">
                         <Avatar editor={editor} size="sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate">{clip.name}</p>
-                          <p className="text-xs text-slate-400 truncate">{clip.projectName}</p>
-                        </div>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-800 truncate">{clip.name}</p><p className="text-xs text-slate-400 truncate">{clip.projectName}</p></div>
                         <StatusBadge status={clip.status} />
                         <button onClick={() => openGCal(`[Digicon] ตามงาน: ${clip.name}`, todayDate.toISOString().split("T")[0], `โปรเจกต์: ${clip.projectName}`)}
                           className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all font-medium">
@@ -699,30 +696,23 @@ export default function App() {
                 </div>
               )}
             </div>
-
             {overdue.length > 0 && (
               <div className="bg-red-50 border border-red-100 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-red-100 flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-red-500" />
-                    <h2 className="font-semibold text-red-700 text-sm">งานเลยกำหนด ({overdue.length} รายการ)</h2>
-                  </div>
-                  <button onClick={() => { overdue.slice(0, 5).forEach((c, i) => setTimeout(() => openGCal(`[Digicon] ⚠ ตามงานด่วน: ${c.name}`, todayDate.toISOString().split("T")[0], `โปรเจกต์: ${c.projectName}\nDeadline เดิม: ${fmtDate(c.deadline)}`), i * 400)); }}
+                  <div className="flex items-center gap-2"><AlertTriangle size={16} className="text-red-500" /><h2 className="font-semibold text-red-700 text-sm">งานเลยกำหนด ({overdue.length} รายการ)</h2></div>
+                  <button onClick={() => overdue.slice(0, 5).forEach((c, i) => setTimeout(() => openGCal(`[Digicon] ⚠ ตามงานด่วน: ${c.name}`, todayDate.toISOString().split("T")[0], `โปรเจกต์: ${c.projectName}\nDeadline เดิม: ${fmtDate(c.deadline)}`), i * 400))}
                     className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-100 transition-colors font-medium">
                     <CalendarPlus size={13} />ตามงานทั้งหมด
                   </button>
                 </div>
                 <div className="divide-y divide-red-100">
                   {overdue.slice(0, 5).map(clip => {
-                    const editor = editors.find(e => e.id === clip.editorId);
+                    const editor = editors.find(e => e.id === clip.editor_id);
                     const days = Math.round((todayDate - new Date(clip.deadline)) / 86400000);
                     return (
                       <div key={clip.id} className="px-5 py-3.5 flex items-center gap-3 flex-wrap">
                         <Avatar editor={editor} size="sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate">{clip.name}</p>
-                          <p className="text-xs text-red-500">เลยกำหนด {days} วัน · {clip.projectName}</p>
-                        </div>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-800 truncate">{clip.name}</p><p className="text-xs text-red-500">เลยกำหนด {days} วัน · {clip.projectName}</p></div>
                         <StatusBadge status={clip.status} />
                       </div>
                     );
@@ -733,10 +723,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══ CALENDAR ═══ */}
+        {/* CALENDAR */}
         {view === "calendar" && <CalendarView allClips={allClips} editors={editors} />}
 
-        {/* ═══ MANAGEMENT ═══ */}
+        {/* MANAGEMENT */}
         {view === "management" && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -745,7 +735,6 @@ export default function App() {
                 <Plus size={16} /><span className="hidden sm:inline">เพิ่มลูกค้า</span>
               </button>
             </div>
-
             {addingProj && (
               <div className="bg-white border border-indigo-200 rounded-2xl p-5 shadow-sm">
                 <h3 className="font-semibold text-slate-800 mb-4 text-sm">เพิ่มลูกค้าใหม่</h3>
@@ -762,13 +751,11 @@ export default function App() {
                 </div>
               </div>
             )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {projects.filter(p => !search || p.client.toLowerCase().includes(search.toLowerCase())).map(project => {
                 const progress = getProgress(project.clips);
                 const pOver = project.clips.filter(c => c.status !== "completed" && new Date(c.deadline) < todayDate);
                 const isEditP = editingProj === project.id;
-
                 return (
                   <div key={project.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-indigo-200 hover:shadow-md transition-all group">
                     {isEditP ? (
@@ -779,24 +766,18 @@ export default function App() {
                           </div>
                         ))}
                         <div className="flex gap-2 pt-1">
-                          <button onClick={saveEditProj} className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium transition-colors"><Save size={12} />บันทึก</button>
-                          <button onClick={() => setEditingProj(null)} className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">ยกเลิก</button>
+                          <button onClick={saveEditProj} className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium"><Save size={12} />บันทึก</button>
+                          <button onClick={() => setEditingProj(null)} className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
                         </div>
                       </div>
                     ) : (
                       <div className="cursor-pointer" onClick={() => { setSelProj(project); setView("project"); }}>
                         <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">{project.client}</h3>
-                            <p className="text-xs text-slate-400 mt-0.5">สร้างเมื่อ {fmtDate(project.createdAt)}</p>
-                          </div>
+                          <div className="flex-1 min-w-0"><h3 className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">{project.client}</h3><p className="text-xs text-slate-400 mt-0.5">สร้างเมื่อ {fmtDate(project.created_at)}</p></div>
                           {pOver.length > 0 && <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full ml-2 shrink-0">เลยกำหนด {pOver.length}</span>}
                         </div>
                         <div className="mb-3">
-                          <div className="flex items-center justify-between text-xs mb-1.5">
-                            <span className="text-slate-500">ความคืบหน้า</span>
-                            <span className={`font-bold ${progress === 100 ? "text-emerald-600" : "text-indigo-600"}`}>{progress}%</span>
-                          </div>
+                          <div className="flex items-center justify-between text-xs mb-1.5"><span className="text-slate-500">ความคืบหน้า</span><span className={`font-bold ${progress === 100 ? "text-emerald-600" : "text-indigo-600"}`}>{progress}%</span></div>
                           <ProgressBar value={progress} />
                           <p className="text-xs text-slate-400 mt-1.5">เสร็จแล้ว {project.clips.filter(c => c.status === "completed").length} จาก {project.clips.length} คลิป</p>
                         </div>
@@ -806,21 +787,14 @@ export default function App() {
                         </div>
                       </div>
                     )}
-
                     {!isEditP && (
                       <div className="flex items-center justify-between pt-1">
                         <div className="flex -space-x-1.5 cursor-pointer" onClick={() => { setSelProj(project); setView("project"); }}>
-                          {[...new Set(project.clips.map(c => c.editorId))].slice(0, 4).map(eid => {
-                            const ed = editors.find(e => e.id === eid);
-                            return ed ? <Avatar key={eid} editor={ed} size="sm" /> : null;
-                          })}
+                          {[...new Set(project.clips.map(c => c.editor_id))].slice(0, 4).map(eid => { const ed = editors.find(e => e.id === eid); return ed ? <Avatar key={eid} editor={ed} size="sm" /> : null; })}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => setGcalModal(project)}
-                            className="flex items-center gap-1 text-xs px-2 py-1.5 border border-slate-200 text-slate-500 rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all font-medium">
-                            <CalendarDays size={13} />Calendar
-                          </button>
-                          <button onClick={() => startEditProj(project)} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"><Pencil size={13} /></button>
+                          <button onClick={() => setGcalModal(project)} className="flex items-center gap-1 text-xs px-2 py-1.5 border border-slate-200 text-slate-500 rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all font-medium"><CalendarDays size={13} />Calendar</button>
+                          <button onClick={() => { setEditingProj(project.id); setEditProjData({ client: project.client, pm: project.pm, broker: project.broker }); }} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"><Pencil size={13} /></button>
                           <button onClick={() => setConfirmDel({ type: "project", id: project.id })} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
                         </div>
                       </div>
@@ -832,26 +806,17 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══ PROJECT DETAIL ═══ */}
+        {/* PROJECT DETAIL */}
         {view === "project" && currentProject && (
           <div className="space-y-5">
             <div className="flex items-center gap-3">
               <button onClick={() => { setView("management"); setSelProj(null); }} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-200 transition-colors text-slate-500"><ArrowLeft size={18} /></button>
-              <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-bold text-slate-800 truncate">{currentProject.client}</h1>
-                <p className="text-slate-500 text-xs">PM: {currentProject.pm} · นายหน้า: {currentProject.broker}</p>
-              </div>
+              <div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-slate-800 truncate">{currentProject.client}</h1><p className="text-slate-500 text-xs">PM: {currentProject.pm} · นายหน้า: {currentProject.broker}</p></div>
               <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => setGcalModal(currentProject)}
-                  className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all font-medium">
-                  <CalendarDays size={14} />Calendar
-                </button>
-                <button onClick={() => setAddingClip(true)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors">
-                  <Plus size={16} /><span className="hidden sm:inline">เพิ่มคลิป</span>
-                </button>
+                <button onClick={() => setGcalModal(currentProject)} className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all font-medium"><CalendarDays size={14} />Calendar</button>
+                <button onClick={() => setAddingClip(true)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors"><Plus size={16} /><span className="hidden sm:inline">เพิ่มคลิป</span></button>
               </div>
             </div>
-
             <div className="bg-white border border-slate-200 rounded-2xl p-4">
               <ProgressBar value={getProgress(currentProject.clips)} />
               <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
@@ -859,35 +824,23 @@ export default function App() {
                 <span>ทั้งหมด {currentProject.clips.length} คลิป</span>
               </div>
             </div>
-
             {addingClip && (
               <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-indigo-800">เพิ่มคลิปใหม่</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <input className="border border-slate-200 rounded-xl px-3 py-2 text-sm col-span-1 sm:col-span-2 lg:col-span-1 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
-                    placeholder="ชื่อคลิป..." value={newClip.name} onChange={e => setNewClip(p => ({ ...p, name: e.target.value }))} />
-                  <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={newClip.editorId} onChange={e => setNewClip(p => ({ ...p, editorId: e.target.value }))}>
+                  <input className="border border-slate-200 rounded-xl px-3 py-2 text-sm col-span-1 sm:col-span-2 lg:col-span-1 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white" placeholder="ชื่อคลิป..." value={newClip.name} onChange={e => setNewClip(p => ({ ...p, name: e.target.value }))} />
+                  <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" value={newClip.editorId} onChange={e => setNewClip(p => ({ ...p, editorId: e.target.value }))}>
                     <option value="">เลือกคนตัดต่อ</option>
                     {editors.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                   </select>
                   <DatePicker value={newClip.deadline} onChange={v => setNewClip(p => ({ ...p, deadline: v }))} placeholder="เลือก Deadline" />
-                  <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={newClip.status} onChange={e => setNewClip(p => ({ ...p, status: e.target.value }))}>
+                  <select className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" value={newClip.status} onChange={e => setNewClip(p => ({ ...p, status: e.target.value }))}>
                     {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="relative">
-                    <MessageSquare size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      placeholder="หมายเหตุ..." value={newClip.note} onChange={e => setNewClip(p => ({ ...p, note: e.target.value }))} />
-                  </div>
-                  <div className="relative">
-                    <Link2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      placeholder="Link งาน (Drive/Frame.io)..." value={newClip.link} onChange={e => setNewClip(p => ({ ...p, link: e.target.value }))} />
-                  </div>
+                  <div className="relative"><MessageSquare size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="หมายเหตุ..." value={newClip.note} onChange={e => setNewClip(p => ({ ...p, note: e.target.value }))} /></div>
+                  <div className="relative"><Link2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="w-full border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="Link งาน..." value={newClip.link} onChange={e => setNewClip(p => ({ ...p, link: e.target.value }))} /></div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => setAddingClip(false)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">ยกเลิก</button>
@@ -895,93 +848,48 @@ export default function App() {
                 </div>
               </div>
             )}
-
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ชื่อคลิป</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">คนตัดต่อ</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Deadline</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">สถานะ</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">หมายเหตุ / Link</th>
-                      <th className="px-4 py-3 w-20"></th>
-                    </tr>
-                  </thead>
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ชื่อคลิป</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">คนตัดต่อ</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Deadline</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">สถานะ</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">หมายเหตุ / Link</th>
+                    <th className="px-4 py-3 w-20"></th>
+                  </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {currentProject.clips.map(clip => {
                       const editing = editingClip === clip.id;
-                      const editor = editors.find(e => e.id === clip.editorId);
+                      const editor = editors.find(e => e.id === clip.editor_id);
                       const isOver = clip.status !== "completed" && new Date(clip.deadline) < todayDate;
                       return (
                         <tr key={clip.id} className={`hover:bg-slate-50 transition-colors ${editing ? "bg-indigo-50/40" : ""}`}>
-                          <td className="px-4 py-3">
-                            {editing ? (
-                              <input className="w-full border border-indigo-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                                defaultValue={clip.name} autoFocus
-                                onBlur={e => updateClip(currentProject.id, clip.id, { name: e.target.value })} />
-                            ) : <span className="font-medium text-slate-700">{clip.name}</span>}
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell">
-                            {editing ? (
-                              <select className="border border-indigo-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none w-32"
-                                value={clip.editorId || ""}
-                                onChange={e => updateClip(currentProject.id, clip.id, { editorId: e.target.value ? parseInt(e.target.value) : null })}>
-                                <option value="">ไม่ระบุ</option>
-                                {editors.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                              </select>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <Avatar editor={editor} size="sm" />
-                                <span className="text-xs text-slate-600">{editor ? editor.name : "ไม่ระบุ"}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 hidden sm:table-cell">
-                            {editing ? (
-                              <DatePicker value={clip.deadline} onChange={v => updateClip(currentProject.id, clip.id, { deadline: v })} />
-                            ) : (
-                              <span className={`text-xs font-medium ${isOver ? "text-red-500" : "text-slate-500"}`}>{fmtDate(clip.deadline)}{isOver ? " ⚠" : ""}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <select className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer"
-                              value={clip.status} onChange={e => updateClip(currentProject.id, clip.id, { status: e.target.value })}>
-                              {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                          <td className="px-4 py-3">{editing ? <input className="w-full border border-indigo-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={clip.name} autoFocus onBlur={e => updateClip(clip.id, { name: e.target.value })} /> : <span className="font-medium text-slate-700">{clip.name}</span>}</td>
+                          <td className="px-4 py-3 hidden md:table-cell">{editing ? (
+                            <select className="border border-indigo-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none w-32" value={clip.editor_id || ""} onChange={e => updateClip(clip.id, { editor_id: e.target.value ? parseInt(e.target.value) : null })}>
+                              <option value="">ไม่ระบุ</option>
+                              {editors.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                             </select>
-                          </td>
-                          <td className="px-4 py-3 hidden lg:table-cell">
-                            {editing ? (
-                              <div className="space-y-1.5">
-                                <input className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none"
-                                  placeholder="หมายเหตุ..." defaultValue={clip.note}
-                                  onBlur={e => updateClip(currentProject.id, clip.id, { note: e.target.value })} />
-                                <input className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none"
-                                  placeholder="Link งาน..." defaultValue={clip.link}
-                                  onBlur={e => updateClip(currentProject.id, clip.id, { link: e.target.value })} />
-                              </div>
-                            ) : (
-                              <div className="space-y-0.5">
-                                {clip.note && <p className="text-xs text-slate-500 truncate max-w-[180px]" title={clip.note}><MessageSquare size={10} className="inline mr-1 text-slate-400" />{clip.note}</p>}
-                                {clip.link && (
-                                  <a href={clip.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1 truncate max-w-[180px]">
-                                    <Link2 size={10} />เปิดลิงก์
-                                  </a>
-                                )}
-                              </div>
-                            )}
-                          </td>
+                          ) : <div className="flex items-center gap-2"><Avatar editor={editor} size="sm" /><span className="text-xs text-slate-600">{editor ? editor.name : "ไม่ระบุ"}</span></div>}</td>
+                          <td className="px-4 py-3 hidden sm:table-cell">{editing ? <DatePicker value={clip.deadline} onChange={v => updateClip(clip.id, { deadline: v })} /> : <span className={`text-xs font-medium ${isOver ? "text-red-500" : "text-slate-500"}`}>{fmtDate(clip.deadline)}{isOver ? " ⚠" : ""}</span>}</td>
+                          <td className="px-4 py-3"><select className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer" value={clip.status} onChange={e => updateClip(clip.id, { status: e.target.value })}>{STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
+                          <td className="px-4 py-3 hidden lg:table-cell">{editing ? (
+                            <div className="space-y-1.5">
+                              <input className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none" placeholder="หมายเหตุ..." defaultValue={clip.note} onBlur={e => updateClip(clip.id, { note: e.target.value })} />
+                              <input className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none" placeholder="Link งาน..." defaultValue={clip.link} onBlur={e => updateClip(clip.id, { link: e.target.value })} />
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {clip.note && <p className="text-xs text-slate-500 truncate max-w-[180px]"><MessageSquare size={10} className="inline mr-1 text-slate-400" />{clip.note}</p>}
+                              {clip.link && <a href={clip.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1 truncate max-w-[180px]"><Link2 size={10} />เปิดลิงก์</a>}
+                            </div>
+                          )}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
-                              <button onClick={() => setEditingClip(editing ? null : clip.id)}
-                                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${editing ? "bg-indigo-600 text-white" : "hover:bg-slate-200 text-slate-400"}`}>
-                                {editing ? <Check size={13} /> : <Edit2 size={13} />}
-                              </button>
-                              <button onClick={() => setConfirmDel({ type: "clip", id: clip.id, projId: currentProject.id })}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 hover:text-red-500 text-slate-300 transition-colors">
-                                <Trash2 size={13} />
-                              </button>
+                              <button onClick={() => setEditingClip(editing ? null : clip.id)} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${editing ? "bg-indigo-600 text-white" : "hover:bg-slate-200 text-slate-400"}`}>{editing ? <Check size={13} /> : <Edit2 size={13} />}</button>
+                              <button onClick={() => setConfirmDel({ type: "clip", id: clip.id })} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 hover:text-red-500 text-slate-300 transition-colors"><Trash2 size={13} /></button>
                             </div>
                           </td>
                         </tr>
@@ -989,36 +897,27 @@ export default function App() {
                     })}
                   </tbody>
                 </table>
-                {currentProject.clips.length === 0 && (
-                  <div className="py-16 text-center">
-                    <Film size={32} className="text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-400 text-sm">ยังไม่มีคลิปในโปรเจกต์นี้</p>
-                    <button onClick={() => setAddingClip(true)} className="mt-3 text-indigo-600 text-sm hover:underline">+ เพิ่มคลิปแรก</button>
-                  </div>
-                )}
+                {currentProject.clips.length === 0 && <div className="py-16 text-center"><Film size={32} className="text-slate-300 mx-auto mb-3" /><p className="text-slate-400 text-sm">ยังไม่มีคลิปในโปรเจกต์นี้</p><button onClick={() => setAddingClip(true)} className="mt-3 text-indigo-600 text-sm hover:underline">+ เพิ่มคลิปแรก</button></div>}
               </div>
             </div>
           </div>
         )}
 
-        {/* ═══ EDITORS LIST ═══ */}
+        {/* EDITORS */}
         {view === "editors" && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div><h1 className="text-2xl font-bold text-slate-800">ทีมตัดต่อ</h1><p className="text-slate-500 text-sm mt-1">{editors.length} คน</p></div>
-              <button onClick={addEditor} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors">
-                <Plus size={16} /><span className="hidden sm:inline">เพิ่มคนตัดต่อ</span>
-              </button>
+              <button onClick={addEditor} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-2xl transition-colors"><Plus size={16} /><span className="hidden sm:inline">เพิ่มคนตัดต่อ</span></button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {editors.map(editor => {
-                const ec = allClips.filter(c => c.editorId === editor.id);
+                const ec = allClips.filter(c => c.editor_id === editor.id);
                 const done = ec.filter(c => c.status === "completed").length;
                 const inProg = ec.filter(c => c.status === "in_progress").length;
                 const ov = ec.filter(c => c.status !== "completed" && new Date(c.deadline) < todayDate);
                 const wl = ec.length;
                 const isEditE = editingEditorId === editor.id;
-
                 return (
                   <div key={editor.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-indigo-200 hover:shadow-md transition-all group">
                     <div className="flex items-center gap-3 mb-4">
@@ -1026,48 +925,31 @@ export default function App() {
                       <div className="flex-1 min-w-0">
                         {isEditE ? (
                           <div className="flex items-center gap-2">
-                            <input autoFocus className="flex-1 border border-indigo-300 rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                              value={editEditorName} onChange={e => setEditEditorName(e.target.value)}
-                              onKeyDown={e => { if (e.key === "Enter") saveEditorName(editor.id); if (e.key === "Escape") setEditingEditorId(null); }} />
+                            <input autoFocus className="flex-1 border border-indigo-300 rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-300" value={editEditorName} onChange={e => setEditEditorName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditorName(editor.id); if (e.key === "Escape") setEditingEditorId(null); }} />
                             <button onClick={() => saveEditorName(editor.id)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-indigo-600 text-white"><Check size={13} /></button>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-slate-800 cursor-pointer" onClick={() => { setSelEditor(editor); setView("editor"); }}>{editor.name}</h3>
-                            <button onClick={() => { setEditingEditorId(editor.id); setEditEditorName(editor.name); }}
-                              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100">
-                              <Pencil size={12} />
-                            </button>
+                            <button onClick={() => { setEditingEditorId(editor.id); setEditEditorName(editor.name); }} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100"><Pencil size={12} /></button>
                           </div>
                         )}
                         <p className="text-xs text-slate-400">คนตัดต่อ</p>
                       </div>
                       <div className="flex items-center gap-1.5">
                         {ov.length > 0 && <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">เลยกำหนด {ov.length}</span>}
-                        <button onClick={() => setConfirmDel({ type: "editor", id: editor.id })}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                          <Trash2 size={13} />
-                        </button>
+                        <button onClick={() => setConfirmDel({ type: "editor", id: editor.id })} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={13} /></button>
                         <ChevronRight size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors cursor-pointer" onClick={() => { setSelEditor(editor); setView("editor"); }} />
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mb-4">
                       {[{ l: "ทั้งหมด", v: wl, c: "text-slate-700" }, { l: "กำลังทำ", v: inProg, c: "text-indigo-600" }, { l: "เสร็จแล้ว", v: done, c: "text-emerald-600" }].map(s => (
-                        <div key={s.l} className="bg-slate-50 rounded-xl p-2.5 text-center">
-                          <div className={`text-xl font-bold ${s.c}`}>{s.v}</div>
-                          <div className="text-xs text-slate-400 mt-0.5">{s.l}</div>
-                        </div>
+                        <div key={s.l} className="bg-slate-50 rounded-xl p-2.5 text-center"><div className={`text-xl font-bold ${s.c}`}>{s.v}</div><div className="text-xs text-slate-400 mt-0.5">{s.l}</div></div>
                       ))}
                     </div>
                     <div>
-                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-                        <span>ภาระงาน</span>
-                        <span className={`font-semibold ${wl >= 8 ? "text-red-500" : wl >= 5 ? "text-amber-500" : "text-emerald-600"}`}>{wl >= 8 ? "หนักมาก" : wl >= 5 ? "ปานกลาง" : "ปกติ"}</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${wl >= 8 ? "bg-red-400" : wl >= 5 ? "bg-amber-400" : "bg-emerald-400"}`}
-                          style={{ width: `${Math.min(wl / 10 * 100, 100)}%` }} />
-                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5"><span>ภาระงาน</span><span className={`font-semibold ${wl >= 8 ? "text-red-500" : wl >= 5 ? "text-amber-500" : "text-emerald-600"}`}>{wl >= 8 ? "หนักมาก" : wl >= 5 ? "ปานกลาง" : "ปกติ"}</span></div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div className={`h-full rounded-full transition-all ${wl >= 8 ? "bg-red-400" : wl >= 5 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${Math.min(wl / 10 * 100, 100)}%` }} /></div>
                     </div>
                   </div>
                 );
@@ -1076,10 +958,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══ EDITOR DETAIL ═══ */}
+        {/* EDITOR DETAIL */}
         {view === "editor" && selEditor && (() => {
           const editorData = editors.find(e => e.id === selEditor.id) || selEditor;
-          const ec = allClips.filter(c => c.editorId === selEditor.id);
+          const ec = allClips.filter(c => c.editor_id === selEditor.id);
           const overdueEc = ec.filter(c => c.status !== "completed" && new Date(c.deadline) < todayDate);
           return (
             <div className="space-y-5">
@@ -1095,25 +977,18 @@ export default function App() {
                 )}
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                {STATUSES.map(s => (
-                  <div key={s.value} className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
-                    <div className="text-2xl font-bold text-slate-800">{ec.filter(c => c.status === s.value).length}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 leading-tight">{s.label}</div>
-                  </div>
-                ))}
+                {STATUSES.map(s => <div key={s.value} className="bg-white border border-slate-200 rounded-2xl p-3 text-center"><div className="text-2xl font-bold text-slate-800">{ec.filter(c => c.status === s.value).length}</div><div className="text-xs text-slate-400 mt-0.5 leading-tight">{s.label}</div></div>)}
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100"><h2 className="font-semibold text-slate-800 text-sm">คลิปทั้งหมด ({ec.length} รายการ)</h2></div>
-                {ec.length === 0 ? (
-                  <div className="py-16 text-center"><Film size={32} className="text-slate-300 mx-auto mb-3" /><p className="text-slate-400 text-sm">ยังไม่มีงานที่รับผิดชอบ</p></div>
-                ) : (
+                {ec.length === 0 ? <div className="py-16 text-center"><Film size={32} className="text-slate-300 mx-auto mb-3" /><p className="text-slate-400 text-sm">ยังไม่มีงานที่รับผิดชอบ</p></div> : (
                   <div className="divide-y divide-slate-100">
                     {ec.map(clip => {
                       const isOver = clip.status !== "completed" && new Date(clip.deadline) < todayDate;
                       return (
                         <div key={clip.id} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                           <div className={`w-2 h-10 rounded-full shrink-0 ${clip.status === "completed" ? "bg-emerald-400" : clip.status === "in_progress" ? "bg-indigo-400" : clip.status === "review" ? "bg-amber-400" : isOver ? "bg-red-400" : "bg-slate-200"}`} />
-                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { const proj = projects.find(p => p.id === clip.projectId); setSelProj(proj); setView("project"); }}>
+                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { const proj = projects.find(p => p.id === clip.project_id); setSelProj(proj); setView("project"); }}>
                             <p className="font-medium text-slate-800 text-sm truncate">{clip.name}</p>
                             <p className="text-xs text-slate-400 mt-0.5 truncate">{clip.projectName}</p>
                             {clip.note && <p className="text-xs text-slate-400 mt-0.5 truncate italic">{clip.note}</p>}
@@ -1122,11 +997,7 @@ export default function App() {
                             <StatusBadge status={clip.status} />
                             <p className={`text-xs ${isOver ? "text-red-500 font-medium" : "text-slate-400"}`}>{fmtDate(clip.deadline)}{isOver ? " ⚠" : ""}</p>
                           </div>
-                          {clip.link && (
-                            <a href={clip.link} target="_blank" rel="noopener noreferrer" className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-colors">
-                              <ExternalLink size={13} />
-                            </a>
-                          )}
+                          {clip.link && <a href={clip.link} target="_blank" rel="noopener noreferrer" className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-colors"><ExternalLink size={13} /></a>}
                         </div>
                       );
                     })}
@@ -1145,8 +1016,7 @@ export default function App() {
             const Icon = item.icon;
             const active = isActive(item.id);
             return (
-              <button key={item.id} onClick={() => navGo(item.id)}
-                className={`flex-1 flex flex-col items-center justify-center gap-1 relative transition-colors ${active ? "text-indigo-600" : "text-slate-400"}`}>
+              <button key={item.id} onClick={() => navGo(item.id)} className={`flex-1 flex flex-col items-center justify-center gap-1 relative transition-colors ${active ? "text-indigo-600" : "text-slate-400"}`}>
                 <Icon size={19} />
                 <span className="text-xs font-medium">{item.label}</span>
                 {active && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-indigo-600 rounded-b-full" />}
