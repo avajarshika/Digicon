@@ -385,9 +385,25 @@ export default function App() {
   }
   async function handleAddClip() {
     if (!newClip.name.trim()) return;
-    setSaving(true);
-    await db.from("clips").insert({ id: makeId(), project_id: currentProject.id, name: newClip.name, editor_id: newClip.editorId ? parseInt(newClip.editorId) : null, deadline: newClip.deadline || addDays(7), status: newClip.status || "pending", note: newClip.note || "", link: newClip.link || "" });
-    setNewClip({ name: "", editorId: "", deadline: "", status: "pending", note: "", link: "" }); setAddingClip(false); setSaving(false);
+    const clip = {
+      id: makeId(),
+      project_id: currentProject.id,
+      name: newClip.name,
+      editor_id: newClip.editorId ? parseInt(newClip.editorId) : null,
+      deadline: newClip.deadline || addDays(7),
+      status: newClip.status || "pending",
+      note: newClip.note || "",
+      link: newClip.link || "",
+    };
+    // Optimistic update — แสดงทันทีไม่รอ Supabase
+    setProjects(prev => prev.map(p =>
+      p.id === currentProject.id ? { ...p, clips: [...p.clips, clip] } : p
+    ));
+    setNewClip({ name: "", editorId: "", deadline: "", status: "pending", note: "", link: "" });
+    setAddingClip(false);
+    setSaving(false);
+    // บันทึกลง Supabase ในพื้นหลัง
+    await db.from("clips").insert(clip);
   }
 
   // ── Editor CRUD ───────────────────────────────────────────────
