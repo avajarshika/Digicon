@@ -356,20 +356,41 @@ export default function App() {
   // ── Project CRUD ──────────────────────────────────────────────
   async function handleAddProj() {
     if (!newProj.client.trim()) return;
-    setSaving(true);
-    await db.from("projects").insert({ id: makeId(), client: newProj.client, pm: newProj.pm, broker: newProj.broker, created_at: new Date().toISOString().split("T")[0] });
-    setNewProj({ client: "", pm: "", broker: "" }); setAddingProj(false); setSaving(false);
+    const proj = {
+      id: makeId(),
+      client: newProj.client,
+      pm: newProj.pm,
+      broker: newProj.broker,
+      created_at: new Date().toISOString().split("T")[0],
+      clips: [],
+    };
+    // Optimistic — แสดงทันที
+    setProjects(prev => [...prev, proj]);
+    setNewProj({ client: "", pm: "", broker: "" });
+    setAddingProj(false);
+    setSaving(false);
+    // บันทึกลง Supabase ในพื้นหลัง
+    const { clips, ...projData } = proj;
+    await db.from("projects").insert(projData);
   }
   async function saveEditProj() {
-    setSaving(true);
+    // Optimistic — อัปเดต UI ทันที
+    setProjects(prev => prev.map(p =>
+      p.id === editingProj ? { ...p, client: editProjData.client, pm: editProjData.pm, broker: editProjData.broker } : p
+    ));
+    setEditingProj(null);
+    setSaving(false);
+    // บันทึกลง Supabase ในพื้นหลัง
     await db.from("projects").update({ client: editProjData.client, pm: editProjData.pm, broker: editProjData.broker }).eq("id", editingProj);
-    setEditingProj(null); setSaving(false);
   }
   async function deleteProj(id) {
-    setSaving(true);
-    await db.from("projects").delete().eq("id", id);
+    // Optimistic — ลบออกจาก UI ทันที
+    setProjects(prev => prev.filter(p => p.id !== id));
     if (selProj && selProj.id === id) { setSelProj(null); setView("management"); }
-    setConfirmDel(null); setSaving(false);
+    setConfirmDel(null);
+    setSaving(false);
+    // ลบใน Supabase ในพื้นหลัง
+    await db.from("projects").delete().eq("id", id);
   }
 
   // ── Clip CRUD ─────────────────────────────────────────────────
@@ -379,9 +400,12 @@ export default function App() {
     await db.from("clips").update(changes).eq("id", cid);
   }
   async function deleteClip(cid) {
-    setSaving(true);
+    // Optimistic — ลบออกจาก UI ทันที
+    setProjects(prev => prev.map(p => ({ ...p, clips: p.clips.filter(c => c.id !== cid) })));
+    setConfirmDel(null);
+    setSaving(false);
+    // ลบใน Supabase ในพื้นหลัง
     await db.from("clips").delete().eq("id", cid);
-    setConfirmDel(null); setSaving(false);
   }
   async function handleAddClip() {
     if (!newClip.name.trim()) return;
