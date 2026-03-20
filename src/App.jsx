@@ -674,6 +674,13 @@ export default function App() {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mb-4">{[{l:"ทั้งหมด",v:wl,c:"text-slate-700"},{l:"กำลังทำ",v:inProg,c:"text-indigo-600"},{l:"เสร็จแล้ว",v:done,c:"text-emerald-600"}].map(s => <div key={s.l} className="bg-slate-50 rounded-xl p-2.5 text-center"><div className={`text-xl font-bold ${s.c}`}>{s.v}</div><div className="text-xs text-slate-400 mt-0.5">{s.l}</div></div>)}</div>
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-slate-500">ความคืบหน้างาน</span>
+                        <span className={`font-bold ${getProgress(ec) === 100 ? "text-emerald-600" : "text-indigo-600"}`}>{getProgress(ec)}%</span>
+                      </div>
+                      <ProgressBar value={getProgress(ec)} />
+                    </div>
                     <div><div className="flex items-center justify-between text-xs text-slate-500 mb-1.5"><span>ภาระงาน</span><span className={`font-semibold ${wl >= 8 ? "text-red-500" : wl >= 5 ? "text-amber-500" : "text-emerald-600"}`}>{wl >= 8 ? "หนักมาก" : wl >= 5 ? "ปานกลาง" : "ปกติ"}</span></div><div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div className={`h-full rounded-full transition-all ${wl >= 8 ? "bg-red-400" : wl >= 5 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${Math.min(wl/10*100,100)}%` }} /></div></div>
                   </div>
                 );
