@@ -6,7 +6,7 @@ import {
   Edit2, Check, Loader2, Circle, Eye, ArrowLeft, Trash2,
   Search, Bell, Target, ChevronDown, CalendarPlus, CalendarDays,
   ExternalLink, Link2, MessageSquare, X, Save, Pencil, RefreshCw,
-  Package, CheckSquare
+  Package, CheckSquare, FileText, Share2
 } from "lucide-react";
 
 const SUPABASE_URL = "https://wkmgpjtxkxomphslddjm.supabase.co";
@@ -685,37 +685,117 @@ export default function App() {
               </div>
             )}
 
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead><tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ชื่อคลิป</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">คนตัดต่อ</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Deadline</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">สถานะ</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">หมายเหตุ / Link</th>
-                    <th className="px-4 py-3 w-20"></th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {currentPkg.clips.map(clip=>{
-                      const editing=editingClip===clip.id;
-                      const editor=editors.find(e=>e.id===clip.editor_id);
-                      const isOver=clip.status!=="completed"&&new Date(clip.deadline)<todayDate;
-                      return(
-                        <tr key={clip.id} className={`hover:bg-slate-50 transition-colors ${editing?"bg-indigo-50/40":""}`}>
-                          <td className="px-4 py-3">{editing?<input className="w-full border border-indigo-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={clip.name} autoFocus onBlur={e=>updateClip(clip.id,{name:e.target.value})}/>:<span className="font-medium text-slate-700">{clip.name}</span>}</td>
-                          <td className="px-4 py-3 hidden md:table-cell">{editing?<select className="border border-indigo-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none w-32" value={clip.editor_id||""} onChange={e=>updateClip(clip.id,{editor_id:e.target.value?parseInt(e.target.value):null})}><option value="">ไม่ระบุ</option>{editors.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>:<div className="flex items-center gap-2"><Avatar editor={editor} size="sm"/><span className="text-xs text-slate-600">{editor?editor.name:"ไม่ระบุ"}</span></div>}</td>
-                          <td className="px-4 py-3 hidden sm:table-cell">{editing?<DatePicker value={clip.deadline} onChange={v=>updateClip(clip.id,{deadline:v})}/>:<span className={`text-xs font-medium ${isOver?"text-red-500":"text-slate-500"}`}>{fmtDate(clip.deadline)}{isOver?" ⚠":""}</span>}</td>
-                          <td className="px-4 py-3"><select className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer" value={clip.status} onChange={e=>updateClip(clip.id,{status:e.target.value})}>{STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select></td>
-                          <td className="px-4 py-3 hidden lg:table-cell">{editing?<div className="space-y-1.5"><input className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none" placeholder="หมายเหตุ..." defaultValue={clip.note} onBlur={e=>updateClip(clip.id,{note:e.target.value})}/><input className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none" placeholder="Link งาน..." defaultValue={clip.link} onBlur={e=>updateClip(clip.id,{link:e.target.value})}/></div>:<div className="space-y-0.5">{clip.note&&<p className="text-xs text-slate-500 truncate max-w-[180px]"><MessageSquare size={10} className="inline mr-1 text-slate-400"/>{clip.note}</p>}{clip.link&&<a href={clip.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1 truncate max-w-[180px]"><Link2 size={10}/>เปิดลิงก์</a>}</div>}</td>
-                          <td className="px-4 py-3"><div className="flex items-center gap-1"><button onClick={()=>setEditingClip(editing?null:clip.id)} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${editing?"bg-indigo-600 text-white":"hover:bg-slate-200 text-slate-400"}`}>{editing?<Check size={13}/>:<Edit2 size={13}/>}</button><button onClick={()=>setConfirmDel({type:"clip",id:clip.id})} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 hover:text-red-500 text-slate-300"><Trash2 size={13}/></button></div></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {currentPkg.clips.length===0&&<div className="py-16 text-center"><Film size={32} className="text-slate-300 mx-auto mb-3"/><p className="text-slate-400 text-sm">ยังไม่มีคลิปในแพคเกจนี้</p><button onClick={()=>setAddingClip(true)} className="mt-3 text-indigo-600 text-sm hover:underline">+ เพิ่มคลิปแรก</button></div>}
-              </div>
+            <div className="space-y-3">
+              {currentPkg.clips.length===0&&<div className="py-16 text-center bg-white border border-slate-200 rounded-2xl"><Film size={32} className="text-slate-300 mx-auto mb-3"/><p className="text-slate-400 text-sm">ยังไม่มีคลิปในแพคเกจนี้</p><button onClick={()=>setAddingClip(true)} className="mt-3 text-indigo-600 text-sm hover:underline">+ เพิ่มคลิปแรก</button></div>}
+              {currentPkg.clips.map(clip=>{
+                const editing=editingClip===clip.id;
+                const editor=editors.find(e=>e.id===clip.editor_id);
+                const isOver=clip.status!=="completed"&&new Date(clip.deadline)<todayDate;
+                const platforms=(clip.post_platforms||"").split(",").filter(Boolean);
+                const PLATFORMS=[{id:"TT",label:"TikTok",color:"bg-slate-800 text-white"},{id:"IG",label:"Instagram",color:"bg-pink-500 text-white"},{id:"FB",label:"Facebook",color:"bg-blue-600 text-white"}];
+                const POST_STATUSES=[{value:"waiting",label:"รอโพสต์",color:"bg-amber-100 text-amber-700"},{value:"posted",label:"โพสต์แล้ว",color:"bg-emerald-100 text-emerald-700"},{value:"cancelled",label:"ยกเลิก",color:"bg-slate-100 text-slate-500"}];
+                const postSt=POST_STATUSES.find(s=>s.value===(clip.post_status||"waiting"))||POST_STATUSES[0];
+                function togglePlatform(pid){
+                  const cur=(clip.post_platforms||"").split(",").filter(Boolean);
+                  const next=cur.includes(pid)?cur.filter(x=>x!==pid):[...cur,pid];
+                  updateClip(clip.id,{post_platforms:next.join(",")});
+                }
+                return(
+                  <div key={clip.id} className={`bg-white border rounded-2xl overflow-hidden transition-all ${editing?"border-indigo-300 shadow-md":"border-slate-200 hover:border-slate-300"}`}>
+                    {/* Row 1: ชื่อ + ปุ่ม */}
+                    <div className="px-4 pt-4 pb-3 flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        {editing
+                          ?<input className="w-full border border-indigo-300 rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={clip.name} autoFocus onBlur={e=>updateClip(clip.id,{name:e.target.value})}/>
+                          :<p className="font-semibold text-slate-800 text-sm">{clip.name}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={()=>setEditingClip(editing?null:clip.id)} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${editing?"bg-indigo-600 text-white":"hover:bg-slate-100 text-slate-400"}`}>{editing?<Check size={13}/>:<Edit2 size={13}/>}</button>
+                        <button onClick={()=>setConfirmDel({type:"clip",id:clip.id})} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 hover:text-red-500 text-slate-300"><Trash2 size={13}/></button>
+                      </div>
+                    </div>
+
+                    {/* Row 2: ตัดต่อ + deadline + สถานะ */}
+                    <div className="px-4 pb-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">คนตัดต่อ</p>
+                        {editing
+                          ?<select className="w-full border border-indigo-300 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none" value={clip.editor_id||""} onChange={e=>updateClip(clip.id,{editor_id:e.target.value?parseInt(e.target.value):null})}><option value="">ไม่ระบุ</option>{editors.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
+                          :<div className="flex items-center gap-1.5"><Avatar editor={editor} size="sm"/><span className="text-xs text-slate-600">{editor?editor.name:"ไม่ระบุ"}</span></div>}
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Deadline ตัดต่อ</p>
+                        {editing
+                          ?<DatePicker value={clip.deadline} onChange={v=>updateClip(clip.id,{deadline:v})}/>
+                          :<span className={`text-xs font-medium ${isOver?"text-red-500":"text-slate-600"}`}>{fmtDate(clip.deadline)}{isOver?" ⚠":""}</span>}
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <p className="text-xs text-slate-400 mb-1">สถานะตัดต่อ</p>
+                        <select className="w-full text-xs border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer" value={clip.status} onChange={e=>updateClip(clip.id,{status:e.target.value})}>{STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select>
+                      </div>
+                    </div>
+
+                    {/* Row 3: Caption */}
+                    <div className="px-4 pb-3 border-t border-slate-100 pt-3">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <FileText size={13} className="text-violet-500"/>
+                        <p className="text-xs font-semibold text-slate-600">Caption</p>
+                      </div>
+                      <textarea
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white resize-none transition-colors"
+                        rows={2}
+                        placeholder="พิมพ์แคปชั่นที่นี่..."
+                        defaultValue={clip.caption||""}
+                        onBlur={e=>updateClip(clip.id,{caption:e.target.value})}
+                      />
+                    </div>
+
+                    {/* Row 4: Social Media */}
+                    <div className="px-4 pb-4 border-t border-slate-100 pt-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Share2 size={13} className="text-pink-500"/>
+                        <p className="text-xs font-semibold text-slate-600">Post Social Media</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {/* Platform toggles */}
+                        <div className="flex gap-1.5 flex-wrap sm:col-span-1">
+                          {PLATFORMS.map(pl=>{
+                            const active=platforms.includes(pl.id);
+                            return<button key={pl.id} onClick={()=>togglePlatform(pl.id)} className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all ${active?pl.color:"bg-slate-100 text-slate-400 hover:bg-slate-200"}`}>{pl.id}</button>;
+                          })}
+                        </div>
+                        {/* Post date */}
+                        <div className="sm:col-span-1">
+                          <DatePicker value={clip.post_date||""} onChange={v=>updateClip(clip.id,{post_date:v})} placeholder="วันที่ลงโพสต์"/>
+                        </div>
+                        {/* Post status */}
+                        <div className="sm:col-span-1">
+                          <select className="w-full text-xs border border-slate-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer" value={clip.post_status||"waiting"} onChange={e=>updateClip(clip.id,{post_status:e.target.value})}>
+                            {POST_STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      {/* Platform badges + post status pill */}
+                      {(platforms.length>0||clip.post_date)&&(
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {platforms.map(pid=>{const pl=PLATFORMS.find(p=>p.id===pid);return pl?<span key={pid} className={`text-xs px-2 py-0.5 rounded-full font-medium ${pl.color}`}>{pl.label}</span>:null;})}
+                          {clip.post_date&&<span className="text-xs text-slate-400">📅 {fmtDate(clip.post_date)}</span>}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${postSt.color}`}>{postSt.label}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Row 5: Note + Link */}
+                    {(clip.note||clip.link||editing)&&(
+                      <div className="px-4 pb-3 border-t border-slate-100 pt-2 flex flex-wrap gap-3">
+                        {editing
+                          ?<><input className="flex-1 min-w-0 border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none" placeholder="หมายเหตุ..." defaultValue={clip.note} onBlur={e=>updateClip(clip.id,{note:e.target.value})}/><input className="flex-1 min-w-0 border border-indigo-300 rounded-lg px-2 py-1 text-xs focus:outline-none" placeholder="Link งาน..." defaultValue={clip.link} onBlur={e=>updateClip(clip.id,{link:e.target.value})}/></>
+                          :<>{clip.note&&<p className="text-xs text-slate-500 flex items-center gap-1"><MessageSquare size={10} className="text-slate-400"/>{clip.note}</p>}{clip.link&&<a href={clip.link} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1"><Link2 size={10}/>เปิดลิงก์</a>}</>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
