@@ -172,6 +172,105 @@ function ConfirmDialog({message,onConfirm,onCancel}) {
   );
 }
 
+// ─── Todo Panel ──────────────────────────────────────────────────
+function TodoPanel({selDay}) {
+  const [todos,setTodos]=useState([]);
+  const [newText,setNewText]=useState("");
+  const [loading,setLoading]=useState(false);
+  const dateStr=selDay?selDay.toISOString().split("T")[0]:todayDate.toISOString().split("T")[0];
+  const displayDate=selDay||todayDate;
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      const {data}=await db.from("todos").select("*").eq("date",dateStr).order("created_at");
+      setTodos(data||[]);
+      setLoading(false);
+    }
+    load();
+  },[dateStr]);
+
+  async function addTodo(){
+    if(!newText.trim())return;
+    const todo={id:makeId(),date:dateStr,text:newText.trim(),done:false,created_at:new Date().toISOString()};
+    setTodos(p=>[...p,todo]);
+    setNewText("");
+    await db.from("todos").insert(todo);
+  }
+  async function toggleTodo(id,done){
+    setTodos(p=>p.map(t=>t.id===id?{...t,done:!done}:t));
+    await db.from("todos").update({done:!done}).eq("id",id);
+  }
+  async function deleteTodo(id){
+    setTodos(p=>p.filter(t=>t.id!==id));
+    await db.from("todos").delete().eq("id",id);
+  }
+
+  const doneCnt=todos.filter(t=>t.done).length;
+  const isToday=displayDate.toDateString()===todayDate.toDateString();
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+        <CheckSquare size={14} className="text-violet-500"/>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-slate-700 truncate">
+            {isToday?"To-do วันนี้":`To-do ${displayDate.getDate()} ${TH_MONTHS_SHORT[displayDate.getMonth()]}`}
+          </h3>
+        </div>
+        {todos.length>0&&(
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${doneCnt===todos.length?"bg-emerald-100 text-emerald-700":"bg-slate-100 text-slate-500"}`}>
+            {doneCnt}/{todos.length}
+          </span>
+        )}
+      </div>
+      {/* Input */}
+      <div className="px-3 py-2.5 border-b border-slate-100 flex gap-2">
+        <input
+          className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300 bg-slate-50"
+          placeholder="เพิ่ม task..."
+          value={newText}
+          onChange={e=>setNewText(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&addTodo()}
+        />
+        <button onClick={addTodo} className="w-8 h-8 flex items-center justify-center rounded-xl bg-violet-600 hover:bg-violet-700 text-white shrink-0 transition-colors">
+          <Plus size={15}/>
+        </button>
+      </div>
+      {/* List */}
+      <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
+        {loading&&<div className="py-6 text-center"><p className="text-xs text-slate-400">กำลังโหลด...</p></div>}
+        {!loading&&todos.length===0&&(
+          <div className="py-8 text-center">
+            <CheckSquare size={24} className="text-slate-200 mx-auto mb-2"/>
+            <p className="text-xs text-slate-400">ยังไม่มี task วันนี้</p>
+          </div>
+        )}
+        {todos.map(todo=>(
+          <div key={todo.id} className={`px-3 py-2.5 flex items-center gap-2.5 group transition-colors ${todo.done?"bg-slate-50":""}`}>
+            <button onClick={()=>toggleTodo(todo.id,todo.done)}
+              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${todo.done?"bg-emerald-500 border-emerald-500":"border-slate-300 hover:border-violet-400"}`}>
+              {todo.done&&<Check size={11} className="text-white"/>}
+            </button>
+            <span className={`flex-1 text-sm leading-snug ${todo.done?"line-through text-slate-400":"text-slate-700"}`}>{todo.text}</span>
+            <button onClick={()=>deleteTodo(todo.id)} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 hover:text-red-500 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
+              <X size={12}/>
+            </button>
+          </div>
+        ))}
+      </div>
+      {/* Progress bar */}
+      {todos.length>0&&(
+        <div className="px-3 py-2.5 border-t border-slate-100">
+          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{width:`${Math.round(doneCnt/todos.length*100)}%`}}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Calendar View ───────────────────────────────────────────────
 function CalendarView({allClips,editors}) {
   const [calYear,setCalYear]=useState(todayDate.getFullYear());
@@ -192,7 +291,7 @@ function CalendarView({allClips,editors}) {
   function nextMo(){calMonth===11?(setCalMonth(0),setCalYear(y=>y+1)):setCalMonth(m=>m+1);}
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-slate-800">ปฏิทิน Deadline</h1><p className="text-slate-500 text-sm mt-1">คลิกวันที่เพื่อดูงาน</p></div>
+      <div><h1 className="text-2xl font-bold text-slate-800">ปฏิทิน Deadline</h1><p className="text-slate-500 text-sm mt-1">คลิกวันที่เพื่อดูงานและ To-do</p></div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -218,15 +317,18 @@ function CalendarView({allClips,editors}) {
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">สถานะงาน</h3>
             <div className="space-y-2.5">{STATUSES.map(s=><div key={s.value} className="flex items-center gap-2.5"><div className={`w-2.5 h-2.5 rounded-full shrink-0 ${s.dot}`}/><span className="text-sm text-slate-600 flex-1">{s.label}</span><span className="text-sm font-bold text-slate-700">{allClips.filter(c=>c.status===s.value).length}</span></div>)}</div>
           </div>
+          {/* To-do Panel */}
+          <TodoPanel selDay={selDay}/>
+          {/* งานวันที่เลือก */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
               <Calendar size={14} className="text-indigo-500"/>
               <h3 className="text-sm font-semibold text-slate-700 flex-1 truncate">{selDay?`${selDay.getDate()} ${TH_MONTHS[selDay.getMonth()]} ${selDay.getFullYear()+543}`:"คลิกวันที่เพื่อดูงาน"}</h3>
               {selClips.length>0&&<span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">{selClips.length}</span>}
             </div>
-            {!selDay?<div className="py-10 text-center"><Calendar size={28} className="text-slate-200 mx-auto mb-2"/><p className="text-slate-400 text-xs">เลือกวันจากปฏิทิน</p></div>
-            :selClips.length===0?<div className="py-10 text-center"><CheckCircle2 size={28} className="text-emerald-300 mx-auto mb-2"/><p className="text-slate-400 text-xs">ไม่มีงานวันนี้</p></div>
-            :<div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">{selClips.map(clip=>{const editor=editors.find(e=>e.id===clip.editor_id);return<div key={clip.id} className="px-4 py-3 flex items-start gap-2"><Avatar editor={editor} size="sm"/><div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-800 truncate">{clip.name}</p><p className="text-xs text-slate-400 truncate">{clip.projectName}</p><div className="mt-1"><StatusBadge status={clip.status}/></div></div></div>;})}</div>}
+            {!selDay?<div className="py-8 text-center"><Calendar size={24} className="text-slate-200 mx-auto mb-2"/><p className="text-slate-400 text-xs">เลือกวันจากปฏิทิน</p></div>
+            :selClips.length===0?<div className="py-8 text-center"><CheckCircle2 size={24} className="text-emerald-300 mx-auto mb-2"/><p className="text-slate-400 text-xs">ไม่มีงานวันนี้</p></div>
+            :<div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">{selClips.map(clip=>{const editor=editors.find(e=>e.id===clip.editor_id);return<div key={clip.id} className="px-4 py-3 flex items-start gap-2"><Avatar editor={editor} size="sm"/><div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-800 truncate">{clip.name}</p><p className="text-xs text-slate-400 truncate">{clip.projectName}</p><div className="mt-1"><StatusBadge status={clip.status}/></div></div></div>;})}</div>}
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-700">งาน 7 วันข้างหน้า</h3></div>
