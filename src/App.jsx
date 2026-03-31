@@ -6,7 +6,7 @@ import {
   Edit2, Check, Loader2, Circle, Eye, ArrowLeft, Trash2,
   Search, Bell, Target, ChevronDown, CalendarPlus, CalendarDays,
   ExternalLink, Link2, MessageSquare, X, Save, Pencil, RefreshCw,
-  Package, CheckSquare, FileText, Share2
+  Package, CheckSquare, FileText, Share2, Download
 } from "lucide-react";
 
 const SUPABASE_URL = "https://wkmgpjtxkxomphslddjm.supabase.co";
@@ -40,6 +40,32 @@ const todayDate = new Date(); todayDate.setHours(0,0,0,0);
 function addDays(n) { const d=new Date(todayDate); d.setDate(d.getDate()+n); return d.toISOString().split("T")[0]; }
 function fmtDate(iso) { if(!iso) return "—"; const d=new Date(iso); return `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()+543).slice(-2)}`; }
 function makeId() { return `id-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; }
+
+// ─── Export Excel ─────────────────────────────────────────────────
+function exportToExcel(projectName, packageName, clips, editors) {
+  const statusLabel = {pending:"รอดำเนินการ",in_progress:"กำลังตัดต่อ",review:"รอตรวจงาน",revision:"แก้ไข",completed:"เสร็จสิ้น"};
+  const rows = [
+    [`ตารางส่งงาน: ${projectName} — ${packageName}`],
+    [],
+    ["ลำดับ","ชื่อคลิป","คนตัดต่อ","Deadline","สถานะตัดต่อ"],
+    ...clips.map((c,i) => {
+      const editor = editors.find(e=>e.id===c.editor_id);
+      return [i+1, c.name, editor?editor.name:"ไม่ระบุ", c.deadline||"", statusLabel[c.status]||c.status];
+    })
+  ];
+
+  // Build CSV with BOM for Thai support
+  const bom = "﻿";
+  const csv = bom + rows.map(r => r.map(cell => `"${String(cell||"").replace(/"/g,'""')}"`).join(",")).join("
+");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${projectName}_${packageName}_ตารางส่งงาน.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 function openGCal(title,date,details) { const s=(date||"").replace(/-/g,""); const d=new Date(date); d.setDate(d.getDate()+1); const e=d.toISOString().split("T")[0].replace(/-/g,""); const p=new URLSearchParams({action:"TEMPLATE",text:title,dates:`${s}/${e}`,details:details||"",sf:"true",output:"xml"}); window.open(`https://calendar.google.com/calendar/render?${p}`,"_blank"); }
 
 function getProgress(clips) {
@@ -181,13 +207,29 @@ function TodoPanel({selDay}) {
   const displayDate=selDay||todayDate;
 
   useEffect(()=>{
+    let cancelled=false;
     async function load(){
       setLoading(true);
-      const {data}=await db.from("todos").select("*").eq("date",dateStr).order("created_at");
-      setTodos(data||[]);
-      setLoading(false);
+      const {data,error}=await db.from("todos").select("*").eq("date",dateStr).order("created_at");
+      if(!cancelled){
+        setTodos(data||[]);
+        setLoading(false);
+      }
     }
     load();
+    // Realtime subscription for todos
+    const ch=db.channel(`todos-${dateStr}`)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"todos",filter:`date=eq.${dateStr}`},({new:r})=>{
+        setTodos(p=>[...p.filter(t=>t.id!==r.id),r].sort((a,b)=>a.created_at>b.created_at?1:-1));
+      })
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"todos",filter:`date=eq.${dateStr}`},({new:r})=>{
+        setTodos(p=>p.map(t=>t.id===r.id?r:t));
+      })
+      .on("postgres_changes",{event:"DELETE",schema:"public",table:"todos"},({old:r})=>{
+        setTodos(p=>p.filter(t=>t.id!==r.id));
+      })
+      .subscribe();
+    return()=>{cancelled=true;db.removeChannel(ch);};
   },[dateStr]);
 
   async function addTodo(){
@@ -749,12 +791,18 @@ export default function App() {
                 <h1 className="text-xl font-bold text-slate-800 truncate">{currentPkg.name}</h1>
                 <p className="text-slate-500 text-xs">{currentProject.client} · {currentPkg.clips.length}/{currentPkg.total_clips} คลิป</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 <button
                   onClick={()=>togglePkgDone(currentPkg)}
                   className={`hidden sm:flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl font-medium transition-colors ${currentPkg.status==="done"?"bg-emerald-100 text-emerald-700 hover:bg-emerald-200":"bg-slate-100 text-slate-500 hover:bg-emerald-100 hover:text-emerald-700"}`}
                 >
                   <CheckSquare size={14}/>{currentPkg.status==="done"?"ยกเลิกเสร็จสิ้น":"เสร็จสิ้นแพคเกจนี้"}
+                </button>
+                <button
+                  onClick={()=>exportToExcel(currentProject.client, currentPkg.name, currentPkg.clips, editors)}
+                  className="flex items-center gap-1.5 text-xs px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors"
+                >
+                  <Download size={14}/>Export Excel
                 </button>
                 <button onClick={()=>setAddingClip(true)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-2xl"><Plus size={16}/><span className="hidden sm:inline">เพิ่มคลิป</span></button>
               </div>
