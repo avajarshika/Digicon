@@ -41,31 +41,31 @@ function addDays(n) { const d=new Date(todayDate); d.setDate(d.getDate()+n); ret
 function fmtDate(iso) { if(!iso) return "—"; const d=new Date(iso); return `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()+543).slice(-2)}`; }
 function makeId() { return `id-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; }
 
-// ─── Export Excel ─────────────────────────────────────────────────
+// ─── Export Excel ────────────────────────────────────────────────
 function exportToExcel(projectName, packageName, clips, editors) {
-  const statusLabel = {pending:"รอดำเนินการ",in_progress:"กำลังตัดต่อ",review:"รอตรวจงาน",revision:"แก้ไข",completed:"เสร็จสิ้น"};
-  const rows = [
-    [`ตารางส่งงาน: ${projectName} — ${packageName}`],
-    [],
-    ["ลำดับ","ชื่อคลิป","คนตัดต่อ","Deadline","สถานะตัดต่อ"],
-    ...clips.map((c,i) => {
-      const editor = editors.find(e=>e.id===c.editor_id);
-      return [i+1, c.name, editor?editor.name:"ไม่ระบุ", c.deadline||"", statusLabel[c.status]||c.status];
-    })
-  ];
-
-  // Build CSV with BOM for Thai support
-  const bom = "﻿";
-  const csv = bom + rows.map(r => r.map(cell => `"${String(cell||"").replace(/"/g,'""')}"`).join(",")).join("
-");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  var statusLabel = {pending:"รอดำเนินการ",in_progress:"กำลังตัดต่อ",review:"รอตรวจงาน",revision:"แก้ไข",completed:"เสร็จสิ้น"};
+  var header = ["ลำดับ","ชื่อคลิป","คนตัดต่อ","Deadline","สถานะตัดต่อ"];
+  var dataRows = clips.map(function(c,i){
+    var editor = editors.find(function(e){return e.id===c.editor_id;});
+    return [i+1, c.name, editor?editor.name:"ไม่ระบุ", c.deadline||"", statusLabel[c.status]||c.status];
+  });
+  var allRows = [["ตารางส่งงาน: "+projectName+" - "+packageName], [], header].concat(dataRows);
+  var bom = "\uFEFF";
+  var csv = bom + allRows.map(function(r){
+    return r.map(function(cell){
+      var s = String(cell||"").replace(/"/g, "\"\"");
+      return "\"" + s + "\"";
+    }).join(",");
+  }).join("\r\n");
+  var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
   a.href = url;
-  a.download = `${projectName}_${packageName}_ตารางส่งงาน.csv`;
+  a.download = projectName+"_"+packageName+"_ตารางส่งงาน.csv";
   a.click();
   URL.revokeObjectURL(url);
 }
+
 function openGCal(title,date,details) { const s=(date||"").replace(/-/g,""); const d=new Date(date); d.setDate(d.getDate()+1); const e=d.toISOString().split("T")[0].replace(/-/g,""); const p=new URLSearchParams({action:"TEMPLATE",text:title,dates:`${s}/${e}`,details:details||"",sf:"true",output:"xml"}); window.open(`https://calendar.google.com/calendar/render?${p}`,"_blank"); }
 
 function getProgress(clips) {
