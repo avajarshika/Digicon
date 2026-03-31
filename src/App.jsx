@@ -41,29 +41,70 @@ function addDays(n) { const d=new Date(todayDate); d.setDate(d.getDate()+n); ret
 function fmtDate(iso) { if(!iso) return "—"; const d=new Date(iso); return `${d.getDate()} ${TH_MONTHS_SHORT[d.getMonth()]} ${String(d.getFullYear()+543).slice(-2)}`; }
 function makeId() { return `id-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; }
 
-// ─── Export Excel ────────────────────────────────────────────────
-function exportToExcel(projectName, packageName, clips, editors) {
-  var statusLabel = {pending:"รอดำเนินการ",in_progress:"กำลังตัดต่อ",review:"รอตรวจงาน",revision:"แก้ไข",completed:"เสร็จสิ้น"};
-  var header = ["ลำดับ","ชื่อคลิป","คนตัดต่อ","Deadline","สถานะตัดต่อ"];
-  var dataRows = clips.map(function(c,i){
-    var editor = editors.find(function(e){return e.id===c.editor_id;});
-    return [i+1, c.name, editor?editor.name:"ไม่ระบุ", c.deadline||"", statusLabel[c.status]||c.status];
+// ─── Export Excel (SheetJS) ──────────────────────────────────────
+async function exportToExcel(projectName, packageName, clips, editors) {
+  const statusLabel = {pending:"รอดำเนินการ",in_progress:"กำลังตัดต่อ",review:"รอตรวจงาน",revision:"แก้ไข",completed:"เสร็จสิ้น"};
+  const statusColor = {pending:"FFE2E8F0",in_progress:"FFE0E7FF",review:"FFFEF3C7",revision:"FFFED7AA",completed:"FFD1FAE5"};
+
+  // Load SheetJS dynamically
+  if (!window.XLSX) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  const XLSX = window.XLSX;
+
+  const sortedClips = [...clips].sort((a,b) => (a.sort_order||999) - (b.sort_order||999));
+  const wb = XLSX.utils.book_new();
+  const wsData = [
+    [`ตารางส่งงาน: ${projectName} — ${packageName}`],
+    [],
+    ["ลำดับ","ชื่อคลิป","คนตัดต่อ","Deadline","สถานะตัดต่อ"],
+    ...sortedClips.map((c,i) => {
+      const editor = editors.find(e => e.id === c.editor_id);
+      return [i+1, c.name, editor?editor.name:"ไม่ระบุ", c.deadline||"", statusLabel[c.status]||c.status];
+    })
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws["!cols"] = [{wch:6},{wch:45},{wch:15},{wch:14},{wch:16}];
+
+  // Merge title row
+  ws["!merges"] = [{s:{r:0,c:0},e:{r:0,c:4}}];
+
+  // Style helper
+  const titleStyle = {font:{bold:true,sz:14,color:{rgb:"FF4338CA"}},alignment:{horizontal:"center"}};
+  const headerStyle = {font:{bold:true,color:{rgb:"FFFFFFFF"}},fill:{fgColor:{rgb:"FF4338CA"}},alignment:{horizontal:"center",vertical:"center"},border:{bottom:{style:"thin",color:{rgb:"FF6366F1"}}}};
+  const cellStyle = {alignment:{vertical:"center",wrapText:true},border:{bottom:{style:"thin",color:{rgb:"FFE2E8F0"}}}};
+
+  // Apply title style
+  if(ws["A1"]) ws["A1"].s = titleStyle;
+
+  // Apply header styles row 3 (index 2)
+  ["A3","B3","C3","D3","E3"].forEach(cell => {
+    if(ws[cell]) ws[cell].s = headerStyle;
   });
-  var allRows = [["ตารางส่งงาน: "+projectName+" - "+packageName], [], header].concat(dataRows);
-  var bom = "\uFEFF";
-  var csv = bom + allRows.map(function(r){
-    return r.map(function(cell){
-      var s = String(cell||"").replace(/"/g, "\"\"");
-      return "\"" + s + "\"";
-    }).join(",");
-  }).join("\r\n");
-  var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement("a");
-  a.href = url;
-  a.download = projectName+"_"+packageName+"_ตารางส่งงาน.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+
+  // Apply data row styles with status colors
+  sortedClips.forEach((_,i) => {
+    const row = i + 4; // data starts row 4
+    const st = sortedClips[i]?.status||"pending";
+    const bgColor = statusColor[st]||"FFFFFFFF";
+    ["A","B","C","D","E"].forEach(col => {
+      const ref = col+row;
+      if(ws[ref]) ws[ref].s = {...cellStyle, fill:{fgColor:{rgb:bgColor}}};
+    });
+  });
+
+  ws["!rows"] = [{hpt:30},{hpt:4},{hpt:22}];
+
+  XLSX.utils.book_append_sheet(wb, ws, packageName.slice(0,31));
+  XLSX.writeFile(wb, `${projectName}_${packageName}_ตารางส่งงาน.xlsx`);
 }
 
 function openGCal(title,date,details) { const s=(date||"").replace(/-/g,""); const d=new Date(date); d.setDate(d.getDate()+1); const e=d.toISOString().split("T")[0].replace(/-/g,""); const p=new URLSearchParams({action:"TEMPLATE",text:title,dates:`${s}/${e}`,details:details||"",sf:"true",output:"xml"}); window.open(`https://calendar.google.com/calendar/render?${p}`,"_blank"); }
@@ -419,7 +460,7 @@ export default function App() {
         db.from("editors").select("*").order("id"),
         db.from("projects").select("*").order("created_at"),
         db.from("packages").select("*").order("created_at"),
-        db.from("clips").select("*"),
+        db.from("clips").select("*").order("sort_order"),
       ]);
       if(!editorsData||editorsData.length===0){await db.from("editors").insert(DEFAULT_EDITORS);setEditors(DEFAULT_EDITORS);}
       else setEditors(editorsData);
@@ -526,7 +567,8 @@ export default function App() {
   }
   async function handleAddClip(){
     if(!newClip.name.trim())return;
-    const clip={id:makeId(),project_id:currentProject.id,package_id:currentPkg.id,name:newClip.name,editor_id:newClip.editorId?parseInt(newClip.editorId):null,deadline:newClip.deadline||addDays(7),status:newClip.status||"pending",note:newClip.note||"",link:newClip.link||""};
+    const maxOrder = currentPkg.clips.length > 0 ? Math.max(...currentPkg.clips.map(c=>c.sort_order||0)) : 0;
+    const clip={id:makeId(),project_id:currentProject.id,package_id:currentPkg.id,name:newClip.name,editor_id:newClip.editorId?parseInt(newClip.editorId):null,deadline:newClip.deadline||addDays(7),status:newClip.status||"pending",note:newClip.note||"",link:newClip.link||"",sort_order:maxOrder+1};
     setProjects(p=>p.map(x=>x.id===currentProject.id?{...x,packages:x.packages.map(pk=>pk.id===currentPkg.id?{...pk,clips:[...pk.clips,clip]}:pk)}:x));
     setNewClip({name:"",editorId:"",deadline:"",status:"pending",note:"",link:""});setAddingClip(false);
     await db.from("clips").insert(clip);
@@ -837,7 +879,7 @@ export default function App() {
 
             <div className="space-y-3">
               {currentPkg.clips.length===0&&<div className="py-16 text-center bg-white border border-slate-200 rounded-2xl"><Film size={32} className="text-slate-300 mx-auto mb-3"/><p className="text-slate-400 text-sm">ยังไม่มีคลิปในแพคเกจนี้</p><button onClick={()=>setAddingClip(true)} className="mt-3 text-indigo-600 text-sm hover:underline">+ เพิ่มคลิปแรก</button></div>}
-              {currentPkg.clips.map(clip=>{
+              {[...currentPkg.clips].sort((a,b)=>(a.sort_order||999)-(b.sort_order||999)).map(clip=>{
                 const editing=editingClip===clip.id;
                 const editor=editors.find(e=>e.id===clip.editor_id);
                 const isOver=clip.status!=="completed"&&new Date(clip.deadline)<todayDate;
